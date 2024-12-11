@@ -1,0 +1,15 @@
+{
+  "name": "chrome-extension",
+  "version": "1.0.0",
+  "description": "Uma extensão do Chrome para gerenciar seu histórico de clipboard com recursos avançados.",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "jimp": "^1.6.0"
+  }
+}

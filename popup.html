@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search clips...">
+      </div>
+      <div class="header-buttons">
+        <button id="settingsBtn" title="Configurações">⚙️</button>
+        <button id="pinBtn" title="Fixar janela">📌</button>
+        <button id="proBtn" class="pro-btn" title="Upgrade para Pro">⭐ Pro</button>
+      </div>
+    </div>
+
+    <nav class="tabs">
+      <button id="recentTab" class="tab-btn" data-tab="recent">Recent</button>
+      <button id="favoritesTab" class="tab-btn" data-tab="favorites">Favorites</button>
+      <div class="tab-indicator"></div>
+    </nav>
+
+    <div class="tab-content">
+      <div id="recentList" class="clip-list" data-tab="recent"></div>
+      <div id="favoritesList" class="clip-list" data-tab="favorites"></div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Settings</h2>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="settings-body">
+          <div class="setting-item">
+            <label>Maximum clips:</label>
+            <div class="number-input">
+              <button class="decrease">-</button>
+              <input type="number" id="maxClips" value="50" min="10" max="1000">
+              <button class="increase">+</button>
+            </div>
+          </div>
+          <div class="setting-actions">
+            <button id="exportBtn">Export Favorites</button>
+            <button id="importBtn">Import Favorites</button>
+            <button id="saveSettingsBtn" class="primary-btn">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pro Modal -->
+    <div id="proModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Upgrade to Pro</h2>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="pro-features">
+          <h3>Pro Features:</h3>
+          <ul>
+            <li>✨ Unlimited recent clips</li>
+            <li>⭐ Unlimited favorites</li>
+            <li>🔍 AI-powered semantic search</li>
+            <li>🚀 Premium support</li>
+          </ul>
+          <button id="upgradeBtn" class="primary-btn">Upgrade Now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

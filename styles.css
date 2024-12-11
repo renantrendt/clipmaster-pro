@@ -1,0 +1,389 @@
+:root {
+  --primary-color: #2196F3;
+  --secondary-color: #FFC107;
+  --text-color: #333;
+  --bg-color: #fff;
+  --hover-color: #f5f5f5;
+  --min-width: 300px;
+  --min-height: 200px;
+  --default-width: 400px;
+  --default-height: 500px;
+}
+
+html {
+  min-width: var(--min-width);
+  min-height: var(--min-height);
+  width: var(--default-width);
+  height: var(--default-height);
+  margin: 0;
+  padding: 0;
+  resize: both;
+  overflow: hidden;
+}
+
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  overflow: hidden;
+}
+
+body.pinned {
+  position: fixed;
+  top: 0;
+  right: 0;
+}
+
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0;
+  color: var(--primary-color);
+}
+
+.search-container {
+  flex-grow: 1;
+  margin-right: 16px;
+}
+
+#searchInput {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.header-buttons button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.header-buttons button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+#pinBtn {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+#pinBtn:hover {
+  opacity: 0.9;
+}
+
+#pinBtn.active {
+  opacity: 1;
+  color: #1a73e8;
+}
+
+.pro-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #f4b400;
+  font-weight: 500;
+}
+
+.tabs {
+  display: flex;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #666;
+  font-size: 14px;
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.tab-btn:hover {
+  color: #1a73e8;
+}
+
+.tab-btn.active {
+  color: #1a73e8;
+}
+
+.tab-indicator {
+  position: absolute;
+  bottom: -1px;
+  height: 2px;
+  width: 50%;
+  background-color: #1a73e8;
+  transition: transform 0.3s ease;
+}
+
+[data-tab="recent"].active ~ .tab-indicator {
+  transform: translateX(0);
+}
+
+[data-tab="favorites"].active ~ .tab-indicator {
+  transform: translateX(100%);
+}
+
+.tab-content {
+  flex-grow: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.clip-list {
+  display: none;
+  height: 100%;
+  overflow-y: auto;
+  margin: 0 -16px;
+  padding: 0 16px;
+}
+
+.clip-list.active {
+  display: block;
+}
+
+.clip-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 8px;
+  background: #fff;
+}
+
+.clip-item:hover {
+  background: #f8f9fa;
+}
+
+.clip-item.clicked {
+  background: #eee;
+  transform: scale(0.98);
+}
+
+.clip-text {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+  color: #333;
+  margin-right: 8px;
+}
+
+.favorite-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 16px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.favorite-btn:hover {
+  opacity: 0.8;
+}
+
+.favorite-btn.active {
+  opacity: 1;
+  color: #f4b400;
+}
+
+.settings {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.settings button {
+  padding: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.settings button:hover {
+  color: var(--primary-color);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.modal.active {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 90%;
+  max-height: 90%;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.close-btn:hover {
+  opacity: 1;
+}
+
+.setting-item {
+  margin-bottom: 16px;
+}
+
+.number-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.number-input input {
+  width: 60px;
+  padding: 4px;
+  text-align: center;
+}
+
+.number-input button {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.number-input button:hover {
+  background: #e0e0e0;
+}
+
+.setting-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.primary-btn {
+  background: #1a73e8;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.primary-btn:hover {
+  background: #1557b0;
+}
+
+.pro-features {
+  padding: 20px 0;
+}
+
+.pro-features ul {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+
+.pro-features li {
+  margin: 10px 0;
+  font-size: 16px;
+}
+
+#upgradeBtn {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: none;
+}
+
+#upgradeBtn:hover {
+  opacity: 0.9;
+}
