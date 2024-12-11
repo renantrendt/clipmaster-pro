@@ -1,11 +1,13 @@
 :root {
-  --primary-color: #2196F3;
-  --secondary-color: #FFC107;
+  --primary-color: #333;
+  --secondary-color: #333;
   --text-color: #333;
   --bg-color: #fff;
   --hover-color: #f5f5f5;
   --min-width: 300px;
   --min-height: 400px;
+  --border-color: #ddd;
+  --accent-color: #1a73e8;
 }
 
 html {
@@ -67,9 +69,18 @@ h1 {
 #searchInput {
   width: 100%;
   padding: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 14px;
+  cursor: pointer;
+}
+
+#searchInput:hover {
+  border-color: var(--accent-color);
+}
+
+#searchInput.pro {
+  cursor: text;
 }
 
 .header-buttons {
@@ -125,6 +136,7 @@ h1 {
   font-size: 12px;
   margin-top: 4px;
   cursor: pointer;
+  user-select: none;
 }
 
 .pro-hint:hover {
@@ -365,10 +377,13 @@ h1 {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: opacity 0.2s;
 }
 
 .primary-btn:hover {
-  background-color: #1976D2;
+  opacity: 0.9;
 }
 
 .pro-features {
@@ -384,6 +399,19 @@ h1 {
 .pro-features li {
   margin: 10px 0;
   font-size: 16px;
+}
+
+.upgrade-button-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.price-caption {
+  color: var(--secondary-color);
+  font-size: 12px;
 }
 
 #upgradeBtn {

@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupSettingsModal();
     await initializeSettings();
     await checkProStatus();
+    setupProHints();
   } catch (error) {
     console.error('Error initializing popup:', error);
   }
@@ -173,6 +174,14 @@ function setupEventListeners() {
   // Search input
   const searchInput = document.getElementById('searchInput');
   if (searchInput) {
+    searchInput.addEventListener('click', async () => {
+      const { isPro } = await chrome.storage.local.get(['isPro']);
+      if (!isPro) {
+        searchInput.blur(); // Remove focus from search input
+        const proModal = document.getElementById('proModal');
+        if (proModal) proModal.style.display = 'block';
+      }
+    });
     searchInput.addEventListener('input', debounce(handleSearch, 300));
   }
   
@@ -263,7 +272,7 @@ function updateList(listId, clips, favoriteClips) {
 }
 
 // Criar item de clip
-function createClipElement(clip, isFavorite) {
+function createClipElement(clip, isFavorite = false) {
   const clipElement = document.createElement('div');
   clipElement.className = 'clip-item';
   
@@ -288,39 +297,19 @@ function createClipElement(clip, isFavorite) {
       // Copy to clipboard
       await navigator.clipboard.writeText(clip.text);
       
-      // Add visual feedback
+      // Visual feedback
       clipElement.classList.add('clicked');
       
-      // If in recent tab, move to top
-      if (currentTab === 'recent') {
-        moveToTop(clip);
+      // Get active tab and send paste message
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab) {
+        chrome.tabs.sendMessage(tab.id, { action: 'paste', text: clip.text });
       }
       
-      // Send message to content script to paste the text
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs[0]) {
-        try {
-          await chrome.tabs.sendMessage(tabs[0].id, {
-            action: 'pasteText',
-            text: clip.text
-          });
-        } catch (error) {
-          console.error('Error sending message to content script:', error);
-        }
-      }
-      
-      // Close popup if not pinned (with a small delay to ensure message is sent)
-      if (!isPinned) {
-        setTimeout(() => {
-          window.close();
-        }, 100);
-      } else {
-        setTimeout(() => {
-          clipElement.classList.remove('clicked');
-        }, 200);
-      }
+      // Close popup after a short delay
+      setTimeout(() => window.close(), 100);
     } catch (error) {
-      console.error('Error handling clip click:', error);
+      console.error('Error:', error);
       clipElement.classList.remove('clicked');
     }
   });
@@ -734,21 +723,23 @@ async function startCheckout() {
 // Verificar status Pro
 async function checkProStatus() {
   try {
-    const userId = await chrome.storage.local.get(['userId']);
-    if (!userId) {
-      // Gerar ID único para o usuário se não existir
-      const newUserId = 'user_' + Date.now();
-      await chrome.storage.local.set({ userId: newUserId });
+    const response = await fetch('http://localhost:3000/api/check-pro', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    }).catch(() => ({ ok: false }));
+
+    if (!response.ok) {
+      console.log('Pro status check failed, defaulting to free user');
+      return false;
     }
-    
-    const response = await fetch(`http://localhost:3000/check-pro-status/${userId.userId}`);
+
     const data = await response.json();
-    
-    isPro = data.isPro;
-    await chrome.storage.local.set({ isPro });
-    updateUI();
+    return data.isPro || false;
   } catch (error) {
-    console.error('Erro ao verificar status Pro:', error);
+    console.log('Error checking pro status, defaulting to free user:', error);
+    return false;
   }
 }
 
@@ -961,14 +952,97 @@ function setupSettingsModal() {
   });
 }
 
+// Initialize settings
+async function initializeSettings() {
+  const { maxClips = 50, maxFavorites = 5 } = await chrome.storage.local.get(['maxClips', 'maxFavorites']);
+  
+  const maxClipsInput = document.getElementById('maxClips');
+  if (maxClipsInput) {
+    maxClipsInput.value = maxClips;
+  }
+
+  const maxFavoritesInput = document.getElementById('maxFavorites');
+  if (maxFavoritesInput) {
+    maxFavoritesInput.value = maxFavorites;
+  }
+}
+
+// Check pro status
+async function checkProStatus() {
+  try {
+    const response = await fetch('http://localhost:3000/api/check-pro');
+    const data = await response.json();
+    return data.isPro;
+  } catch (error) {
+    console.error('Error checking pro status:', error);
+    return false;
+  }
+}
+
+// Setup settings modal
+function setupSettingsModal() {
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const closeBtn = document.querySelector('.close-btn');
+  const saveBtn = document.getElementById('saveSettingsBtn');
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+      settingsModal.style.display = 'block';
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      settingsModal.style.display = 'none';
+    });
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const maxClips = parseInt(document.getElementById('maxClips').value) || 50;
+      const maxFavorites = parseInt(document.getElementById('maxFavorites').value) || 5;
+      
+      await chrome.storage.local.set({ maxClips, maxFavorites });
+      settingsModal.style.display = 'none';
+      
+      // Refresh clips display
+      await loadClips();
+    });
+  }
+}
+
+// Setup pro hints click handlers
+function setupProHints() {
+  const proHints = document.querySelectorAll('.pro-hint');
+  const proModal = document.getElementById('proModal');
+
+  proHints.forEach(hint => {
+    hint.addEventListener('click', () => {
+      if (proModal) {
+        proModal.style.display = 'block';
+      }
+    });
+  });
+
+  // Setup close button for pro modal
+  const closeBtn = proModal?.querySelector('.close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      proModal.style.display = 'none';
+    });
+  }
+}
+
 // Initialize when document is loaded
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     await initializePopup();
     setupEventListeners();
-    setupSettingsModal(); // Make sure this is called
+    setupSettingsModal();
     await initializeSettings();
     await checkProStatus();
+    setupProHints();
   } catch (error) {
     console.error('Error initializing popup:', error);
   }

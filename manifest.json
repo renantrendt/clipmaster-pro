@@ -7,27 +7,33 @@
     "storage",
     "clipboardRead",
     "clipboardWrite",
+    "scripting",
     "activeTab",
-    "scripting"
+    "tabs"
   ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
+      "all_frames": true,
       "run_at": "document_start"
     }
   ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "host_permissions": [
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": "icons/icon.svg"
   },
-  "background": {
-    "service_worker": "background.js"
-  },
   "icons": {
-    "16": "icons/icon.svg"
+    "16": "icons/icon.svg",
+    "48": "icons/icon.svg",
+    "128": "icons/icon.svg"
   }
 }

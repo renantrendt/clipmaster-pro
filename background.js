@@ -1,62 +1,106 @@
-// Inicializar storage quando a extensão é instalada
+// Initialize storage when extension is installed
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Extensão instalada/atualizada');
-  chrome.storage.local.get(['recentClips', 'favoriteClips'], function(result) {
+  console.log('Extension installed/updated');
+  chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips'], function(result) {
     if (!result.recentClips) {
       chrome.storage.local.set({ recentClips: [] });
-      console.log('Storage inicializado: recentClips');
+      console.log('Storage initialized: recentClips');
     }
     if (!result.favoriteClips) {
       chrome.storage.local.set({ favoriteClips: [] });
-      console.log('Storage inicializado: favoriteClips');
+      console.log('Storage initialized: favoriteClips');
+    }
+    if (!result.maxClips) {
+      chrome.storage.local.set({ maxClips: 50 });
+      console.log('Storage initialized: maxClips');
     }
   });
 });
 
-// Listener para mensagens do content script
+// Listen for messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('Mensagem recebida no background:', message);
-  
-  if (message.action === 'newClip') {
-    handleNewClip(message.text).then(() => {
-      sendResponse({ success: true });
-    }).catch(error => {
-      console.error('Error handling new clip:', error);
-      sendResponse({ success: false, error: error.message });
-    });
-    
-    // Importante: retornar true para indicar que a resposta será assíncrona
+  if (message.action === 'copyToClipboard') {
+    handleNewClip(message.text);
+    // Important: return true to indicate async response
     return true;
   }
 });
 
-async function handleNewClip(text) {
-  console.log('Handling new clip:', text);
-  
-  // Buscar clips existentes
-  const data = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-  let recentClips = data.recentClips || [];
-  
-  // Remover duplicatas
-  recentClips = recentClips.filter(clip => clip.text !== text);
-  
-  // Adicionar novo clip no início
-  recentClips.unshift({
-    text: text,
-    timestamp: Date.now()
-  });
-  
-  // Salvar clips atualizados
-  await chrome.storage.local.set({ recentClips });
-  console.log('Clips salvos:', recentClips);
-  
-  // Notificar popup se estiver aberto
+let lastClipboardContent = '';
+
+// Check clipboard periodically
+async function checkClipboard() {
   try {
-    chrome.runtime.sendMessage({ 
+    // Get active tab to execute script
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+
+    // Skip chrome:// and edge:// URLs
+    if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
+      return;
+    }
+
+    // Read clipboard through content script
+    const result = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        return new Promise((resolve) => {
+          navigator.clipboard.readText()
+            .then(text => resolve(text))
+            .catch(() => resolve(''));
+        });
+      }
+    });
+
+    const text = result[0]?.result;
+    if (text && text !== lastClipboardContent) {
+      lastClipboardContent = text;
+      handleNewClip(text);
+    }
+  } catch (error) {
+    // Silently ignore errors for restricted pages
+    if (!error.message.includes('Cannot access')) {
+      console.error('Error checking clipboard:', error);
+    }
+  }
+}
+
+// Start monitoring clipboard
+setInterval(checkClipboard, 1000);
+
+// Handle new clipboard content
+async function handleNewClip(text) {
+  try {
+    // Get current clips and settings
+    const { recentClips = [], maxClips = 50 } = await chrome.storage.local.get(['recentClips', 'maxClips']);
+    
+    // Check if this clip already exists
+    if (recentClips.some(clip => clip.text === text)) {
+      return;
+    }
+
+    // Create new clip
+    const newClip = {
+      id: Date.now(),
+      text,
+      timestamp: new Date().toISOString()
+    };
+
+    // Add to beginning and respect maxClips limit
+    const updatedClips = [newClip, ...recentClips].slice(0, maxClips);
+
+    // Save to storage
+    await chrome.storage.local.set({ recentClips: updatedClips });
+
+    // Notify popup if open
+    chrome.runtime.sendMessage({
       action: 'updateClips',
-      clips: recentClips
+      clips: updatedClips
+    }).catch(() => {
+      // Ignore error if popup is not open
+      console.log('Popup not open for update');
     });
   } catch (error) {
-    console.log('Popup não está aberto para atualização');
+    console.error('Error handling new clip:', error);
   }
 }
