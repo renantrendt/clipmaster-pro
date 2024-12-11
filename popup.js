@@ -220,47 +220,16 @@ function switchTab(tab) {
 // Carregar clips
 async function loadClips() {
   try {
-    console.log('Loading clips for tab:', currentTab);
+    const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
+      await chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips', 'maxFavorites']);
     
-    const data = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    console.log('Loaded clips data:', data);
+    // Ensure we don't exceed the limits
+    recentClips = savedRecent.slice(0, maxClips);
+    favoriteClips = savedFavorites.slice(0, maxFavorites);
     
-    const recentClips = data.recentClips || [];
-    const favoriteClips = data.favoriteClips || [];
-    
-    // Limpar ambas as listas
-    const recentList = document.getElementById('recentList');
-    const favoritesList = document.getElementById('favoritesList');
-    
-    // Atualizar a lista ativa
-    if (currentTab === 'recent') {
-      console.log('Updating recent list');
-      if (recentList) {
-        recentList.innerHTML = '';
-        if (recentClips.length === 0) {
-          recentList.innerHTML = '<div class="empty-state">Nenhum clip ainda</div>';
-        } else {
-          recentClips.forEach(clip => {
-            const isFavorite = favoriteClips.some(f => f.text === clip.text);
-            const clipElement = createClipElement(clip, isFavorite);
-            recentList.appendChild(clipElement);
-          });
-        }
-      }
-    } else {
-      console.log('Updating favorites list');
-      if (favoritesList) {
-        favoritesList.innerHTML = '';
-        if (favoriteClips.length === 0) {
-          favoritesList.innerHTML = '<div class="empty-state">Nenhum favorito ainda</div>';
-        } else {
-          favoriteClips.forEach(clip => {
-            const clipElement = createClipElement(clip, true);
-            favoritesList.appendChild(clipElement);
-          });
-        }
-      }
-    }
+    // Update the lists
+    updateRecentList(recentClips, favoriteClips);
+    updateList('favoritesList', favoriteClips, favoriteClips);
   } catch (error) {
     console.error('Error loading clips:', error);
   }
@@ -574,54 +543,60 @@ async function saveSettings() {
 
 // Gerenciamento de clips
 async function addClip(text) {
-  const clip = { text, timestamp: Date.now() };
+  if (!text) return;
   
-  // Remove duplicatas
-  recentClips = recentClips.filter(c => c.text !== text);
-  
-  // Adiciona no início
-  recentClips.unshift(clip);
-  
-  // Aplica limite
-  const limit = isPro ? PRO_LIMIT : DEFAULT_RECENT_LIMIT;
-  recentClips = recentClips.slice(0, limit);
-  
-  await saveClips();
-  updateUI();
+  try {
+    const { maxClips = DEFAULT_RECENT_LIMIT } = await chrome.storage.local.get(['maxClips']);
+    
+    // Remove duplicates
+    recentClips = recentClips.filter(clip => clip.text !== text);
+    
+    // Add new clip at the beginning
+    recentClips.unshift({
+      id: Date.now(),
+      text,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Enforce limit
+    recentClips = recentClips.slice(0, maxClips);
+    
+    // Save and update UI
+    await saveClips();
+    updateRecentList(recentClips, favoriteClips);
+  } catch (error) {
+    console.error('Error adding clip:', error);
+  }
 }
 
 async function toggleFavorite(clip) {
   try {
-    const data = await chrome.storage.local.get(['favoriteClips']);
-    let favoriteClips = data.favoriteClips || [];
+    const { isPro, maxFavorites = 5 } = await chrome.storage.local.get(['isPro', 'maxFavorites']);
     const isFavorite = favoriteClips.some(f => f.text === clip.text);
     
-    if (isFavorite) {
+    if (!isFavorite) {
+      // Check favorites limit for free users
+      if (!isPro && favoriteClips.length >= maxFavorites) {
+        const proModal = document.getElementById('proModal');
+        if (proModal) {
+          proModal.style.display = 'block';
+        }
+        return;
+      }
+      
+      // Add to favorites
+      favoriteClips.unshift({ ...clip, timestamp: new Date().toISOString() });
+      favoriteClips = favoriteClips.slice(0, maxFavorites); // Ensure limit
+    } else {
       // Remove from favorites
       favoriteClips = favoriteClips.filter(f => f.text !== clip.text);
-    } else {
-      // Add to favorites if not already there
-      if (!favoriteClips.some(f => f.text === clip.text)) {
-        favoriteClips.unshift({ ...clip, timestamp: Date.now() });
-      }
     }
     
-    // Save updated favorites
-    await chrome.storage.local.set({ favoriteClips });
+    await saveClips();
     
-    // Only update the UI of the current list without reloading everything
-    const allClipItems = document.querySelectorAll('.clip-item');
-    allClipItems.forEach(item => {
-      const textElement = item.querySelector('.clip-text');
-      if (textElement && textElement.textContent === clip.text) {
-        const starButton = item.querySelector('.favorite-btn');
-        if (starButton) {
-          starButton.innerHTML = isFavorite ? '☆' : '⭐';
-          starButton.classList.toggle('active', !isFavorite);
-          starButton.title = isFavorite ? 'Adicionar aos favoritos' : 'Remover dos favoritos';
-        }
-      }
-    });
+    // Update both lists to reflect changes
+    updateRecentList(recentClips, favoriteClips);
+    updateList('favoritesList', favoriteClips, favoriteClips);
   } catch (error) {
     console.error('Error toggling favorite:', error);
   }
@@ -826,31 +801,45 @@ function toggleModal(modalId, show) {
 function setupSettingsModal() {
   const settingsBtn = document.getElementById('settingsBtn');
   const settingsModal = document.getElementById('settingsModal');
-  const closeBtn = settingsModal.querySelector('.close-btn');
+  const closeBtn = settingsModal?.querySelector('.close-btn');
   const saveBtn = document.getElementById('saveSettingsBtn');
   const maxClipsInput = document.getElementById('maxClips');
+  const maxFavoritesInput = document.getElementById('maxFavorites');
   const proHint = document.querySelector('.pro-hint');
 
-  if (!settingsBtn || !settingsModal || !closeBtn || !saveBtn || !maxClipsInput) {
+  // Only proceed if we have all required elements
+  if (!settingsBtn || !settingsModal || !closeBtn || !saveBtn || !maxClipsInput || !maxFavoritesInput) {
     console.error('Settings elements not found');
     return;
   }
 
   // Open settings modal
   settingsBtn.addEventListener('click', async () => {
-    console.log('Settings button clicked');
-    const { isPro } = await chrome.storage.local.get(['isPro']);
-    maxClipsInput.max = isPro ? '1000' : '50';
-    settingsModal.style.display = 'block';
-    maxClipsInput.focus();
+    try {
+      const { isPro, maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
+        await chrome.storage.local.get(['isPro', 'maxClips', 'maxFavorites']);
+      
+      maxClipsInput.max = isPro ? '1000' : '50';
+      maxClipsInput.value = maxClips;
+      
+      maxFavoritesInput.max = isPro ? '1000' : '5';
+      maxFavoritesInput.value = maxFavorites;
+      
+      settingsModal.style.display = 'block';
+      maxClipsInput.focus();
+    } catch (error) {
+      console.error('Error opening settings:', error);
+    }
   });
 
   // Pro hint click
-  proHint?.addEventListener('click', () => {
-    settingsModal.style.display = 'none';
-    const proModal = document.getElementById('proModal');
-    if (proModal) proModal.style.display = 'block';
-  });
+  if (proHint) {
+    proHint.addEventListener('click', () => {
+      settingsModal.style.display = 'none';
+      const proModal = document.getElementById('proModal');
+      if (proModal) proModal.style.display = 'block';
+    });
+  }
 
   // Close settings modal
   closeBtn.addEventListener('click', () => {
@@ -865,9 +854,9 @@ function setupSettingsModal() {
   });
 
   function updateMaxClipsValue(change) {
-    const currentValue = parseInt(maxClipsInput.value);
-    const min = parseInt(maxClipsInput.min);
-    const max = parseInt(maxClipsInput.max);
+    const currentValue = parseInt(maxClipsInput.value) || DEFAULT_RECENT_LIMIT;
+    const min = parseInt(maxClipsInput.min) || 10;
+    const max = parseInt(maxClipsInput.max) || 50;
     const newValue = currentValue + change;
     
     if (newValue >= min && newValue <= max) {
@@ -875,7 +864,7 @@ function setupSettingsModal() {
     }
   }
 
-  // Keyboard controls
+  // Keyboard controls for max clips
   maxClipsInput.addEventListener('keydown', (event) => {
     switch(event.key) {
       case 'ArrowUp':
@@ -897,20 +886,78 @@ function setupSettingsModal() {
     }
   });
 
+  function updateMaxFavoritesValue(change) {
+    const currentValue = parseInt(maxFavoritesInput.value) || 5;
+    const min = parseInt(maxFavoritesInput.min) || 1;
+    const max = parseInt(maxFavoritesInput.max) || 5;
+    const newValue = currentValue + change;
+    
+    if (newValue >= min && newValue <= max) {
+      maxFavoritesInput.value = newValue;
+    }
+  }
+
+  // Keyboard controls for max favorites
+  maxFavoritesInput.addEventListener('keydown', (event) => {
+    switch(event.key) {
+      case 'ArrowUp':
+        event.preventDefault();
+        updateMaxFavoritesValue(1);
+        break;
+      case 'ArrowDown':
+        event.preventDefault();
+        updateMaxFavoritesValue(-1);
+        break;
+      case 'Enter':
+        event.preventDefault();
+        saveBtn.click();
+        break;
+      case 'Escape':
+        event.preventDefault();
+        settingsModal.style.display = 'none';
+        break;
+    }
+  });
+
   // Save settings
   saveBtn.addEventListener('click', async () => {
-    const maxClips = parseInt(maxClipsInput.value);
-    const { isPro } = await chrome.storage.local.get(['isPro']);
-    
-    if (!isPro && maxClips > 50) {
-      maxClipsInput.value = 50;
-      const proModal = document.getElementById('proModal');
-      if (proModal) proModal.style.display = 'block';
-      return;
+    try {
+      const maxClips = parseInt(maxClipsInput.value) || DEFAULT_RECENT_LIMIT;
+      const maxFavorites = parseInt(maxFavoritesInput.value) || 5;
+      const { isPro } = await chrome.storage.local.get(['isPro']);
+      
+      // Validate limits for free users
+      if (!isPro) {
+        if (maxClips > 50) {
+          maxClipsInput.value = 50;
+          const proModal = document.getElementById('proModal');
+          if (proModal) proModal.style.display = 'block';
+          return;
+        }
+        if (maxFavorites > 5) {
+          maxFavoritesInput.value = 5;
+          const proModal = document.getElementById('proModal');
+          if (proModal) proModal.style.display = 'block';
+          return;
+        }
+      }
+      
+      // Save the new settings
+      await chrome.storage.local.set({ maxClips, maxFavorites });
+      
+      // Trim both lists if needed
+      recentClips = recentClips.slice(0, maxClips);
+      favoriteClips = favoriteClips.slice(0, maxFavorites);
+      
+      // Save and update UI
+      await saveClips();
+      updateRecentList(recentClips, favoriteClips);
+      updateList('favoritesList', favoriteClips, favoriteClips);
+      
+      settingsModal.style.display = 'none';
+    } catch (error) {
+      console.error('Error saving settings:', error);
     }
-    
-    await chrome.storage.local.set({ maxClips });
-    settingsModal.style.display = 'none';
   });
 }
 
