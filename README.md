@@ -6,9 +6,7 @@ You can also use AI-powered semantic search to find related clips.
 
 ## Demo
 
-<a href="https://www.loom.com/share/bd1e0b05ccef467682219f3b02fbe2dd">
-    <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/bd1e0b05ccef467682219f3b02fbe2dd-with-play.gif">
-</a>
+[![ClipMaster Pro Demo](https://cdn.loom.com/sessions/thumbnails/bd1e0b05ccef467682219f3b02fbe2dd-with-play.gif)](https://www.loom.com/share/bd1e0b05ccef467682219f3b02fbe2dd)
 
 ## Features
 
