@@ -29,25 +29,20 @@
     </div>
 
     <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
+    <div class="modal" id="settingsModal">
       <div class="modal-content">
-        <div class="modal-header">
-          <h2>Settings</h2>
-          <button class="close-btn">&times;</button>
-        </div>
-        <div class="settings-body">
+        <span class="close-btn">&times;</span>
+        <h2>Settings</h2>
+        <div class="settings-form">
           <div class="setting-item">
             <label>Maximum clips:</label>
             <div class="number-input">
-              <button class="decrease">-</button>
-              <input type="number" id="maxClips" value="50" min="10" max="1000">
-              <button class="increase">+</button>
+              <input type="number" id="maxClips" value="50" min="10" max="50">
             </div>
+            <small class="pro-hint">Upgrade to Pro for unlimited clips!</small>
           </div>
           <div class="setting-actions">
-            <button id="exportBtn">Export Favorites</button>
-            <button id="importBtn">Import Favorites</button>
-            <button id="saveSettingsBtn" class="primary-btn">Save</button>
+            <button id="saveSettingsBtn">Save</button>
           </div>
         </div>
       </div>

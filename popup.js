@@ -24,13 +24,21 @@ let pinnedWindowId = null;
 // Inicialização
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Popup opened');
-  await initializePopup();
+  try {
+    await initializePopup();
+    setupEventListeners();
+    setupSettingsModal();
+    await initializeSettings();
+    await checkProStatus();
+  } catch (error) {
+    console.error('Error initializing popup:', error);
+  }
 });
 
 async function initializePopup() {
   try {
     // Primeiro, configurar os event listeners
-    setupEventListeners();
+    // setupEventListeners();
     
     // Depois, carregar os dados
     const data = await chrome.storage.local.get(['recentClips', 'favoriteClips', 'isPinned', 'pinnedWindowId']);
@@ -135,8 +143,15 @@ function setupEventListeners() {
   });
   
   // Settings Modal
-  document.getElementById('settingsBtn')?.addEventListener('click', () => toggleModal('settingsModal', true));
-  document.getElementById('proBtn')?.addEventListener('click', () => toggleModal('proModal', true));
+  const settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => toggleModal('settingsModal', true));
+  }
+
+  const proBtn = document.getElementById('proBtn');
+  if (proBtn) {
+    proBtn.addEventListener('click', () => toggleModal('proModal', true));
+  }
   
   // Close buttons for modals
   document.querySelectorAll('.close-btn').forEach(btn => {
@@ -147,6 +162,13 @@ function setupEventListeners() {
       }
     });
   });
+
+  // Close modal when clicking outside
+  window.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal')) {
+      toggleModal(event.target.id, false);
+    }
+  });
   
   // Search input
   const searchInput = document.getElementById('searchInput');
@@ -155,14 +177,21 @@ function setupEventListeners() {
   }
   
   // Pin Button
-  document.getElementById('pinBtn').addEventListener('click', togglePin);
+  const pinBtn = document.getElementById('pinBtn');
+  if (pinBtn) {
+    pinBtn.addEventListener('click', togglePin);
+  }
   
   // Export/Import
-  document.getElementById('exportBtn').addEventListener('click', exportFavorites);
-  document.getElementById('importBtn').addEventListener('click', importFavorites);
-  
-  // Max Clips Controls
-  setupMaxClipsControls();
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportFavorites);
+  }
+
+  const importBtn = document.getElementById('importBtn');
+  if (importBtn) {
+    importBtn.addEventListener('click', importFavorites);
+  }
 }
 
 // Alternar entre abas
@@ -780,3 +809,120 @@ function updatePinButton() {
     pinBtn.title = isPinned ? 'Desafixar janela' : 'Fixar janela';
   }
 }
+
+// Toggle modal visibility
+function toggleModal(modalId, show) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.style.display = show ? 'block' : 'none';
+    if (show && modalId === 'settingsModal') {
+      const maxClipsInput = document.getElementById('maxClips');
+      if (maxClipsInput) maxClipsInput.focus();
+    }
+  }
+}
+
+// Settings Modal
+function setupSettingsModal() {
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const closeBtn = settingsModal.querySelector('.close-btn');
+  const saveBtn = document.getElementById('saveSettingsBtn');
+  const maxClipsInput = document.getElementById('maxClips');
+  const proHint = document.querySelector('.pro-hint');
+
+  if (!settingsBtn || !settingsModal || !closeBtn || !saveBtn || !maxClipsInput) {
+    console.error('Settings elements not found');
+    return;
+  }
+
+  // Open settings modal
+  settingsBtn.addEventListener('click', async () => {
+    console.log('Settings button clicked');
+    const { isPro } = await chrome.storage.local.get(['isPro']);
+    maxClipsInput.max = isPro ? '1000' : '50';
+    settingsModal.style.display = 'block';
+    maxClipsInput.focus();
+  });
+
+  // Pro hint click
+  proHint?.addEventListener('click', () => {
+    settingsModal.style.display = 'none';
+    const proModal = document.getElementById('proModal');
+    if (proModal) proModal.style.display = 'block';
+  });
+
+  // Close settings modal
+  closeBtn.addEventListener('click', () => {
+    settingsModal.style.display = 'none';
+  });
+
+  // Close modal when clicking outside
+  window.addEventListener('click', (event) => {
+    if (event.target === settingsModal) {
+      settingsModal.style.display = 'none';
+    }
+  });
+
+  function updateMaxClipsValue(change) {
+    const currentValue = parseInt(maxClipsInput.value);
+    const min = parseInt(maxClipsInput.min);
+    const max = parseInt(maxClipsInput.max);
+    const newValue = currentValue + change;
+    
+    if (newValue >= min && newValue <= max) {
+      maxClipsInput.value = newValue;
+    }
+  }
+
+  // Keyboard controls
+  maxClipsInput.addEventListener('keydown', (event) => {
+    switch(event.key) {
+      case 'ArrowUp':
+        event.preventDefault();
+        updateMaxClipsValue(10);
+        break;
+      case 'ArrowDown':
+        event.preventDefault();
+        updateMaxClipsValue(-10);
+        break;
+      case 'Enter':
+        event.preventDefault();
+        saveBtn.click();
+        break;
+      case 'Escape':
+        event.preventDefault();
+        settingsModal.style.display = 'none';
+        break;
+    }
+  });
+
+  // Save settings
+  saveBtn.addEventListener('click', async () => {
+    const maxClips = parseInt(maxClipsInput.value);
+    const { isPro } = await chrome.storage.local.get(['isPro']);
+    
+    if (!isPro && maxClips > 50) {
+      maxClipsInput.value = 50;
+      const proModal = document.getElementById('proModal');
+      if (proModal) proModal.style.display = 'block';
+      return;
+    }
+    
+    await chrome.storage.local.set({ maxClips });
+    settingsModal.style.display = 'none';
+  });
+}
+
+// Initialize when document is loaded
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await initializePopup();
+    setupEventListeners();
+    setupSettingsModal(); // Make sure this is called
+    await initializeSettings();
+    await checkProStatus();
+  } catch (error) {
+    console.error('Error initializing popup:', error);
+  }
+});
