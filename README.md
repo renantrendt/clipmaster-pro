@@ -1,51 +1,52 @@
 # ClipMaster Pro
 
-Uma extensão avançada para gerenciamento de clipboard no Chrome, oferecendo recursos premium para uma experiência aprimorada de cópia e colagem.
+Never lose a clipboard again! This app saves all your clips and when you click on a clip, it automatically copies and pastes.
 
-## Recursos
+You can also use AI-powered semantic search to find related clips.
 
-### Versão Gratuita
-- ✂️ Histórico de clips recentes
-- ⭐ Lista de favoritos
-- 📌 Opção de fixar a janela
-- 🔄 Sincronização automática
+## Features
 
-### Versão Pro
-- ✨ Clips recentes ilimitados
-- ⭐ Favoritos ilimitados
-- 🔍 Busca semântica com IA
-- 🚀 Suporte premium
+### Free Version
+- After selecting a clip, the text automatically copies and pastes
+- ✂️ Recent clips history
+- ⭐ Favorites list
+- 📌 Window pinning option
 
-## Instalação
+### Pro Version
+- ✨ Unlimited clips history
+- ⭐ Unlimited favorites
+- 🔍 AI-powered semantic search
 
-1. Clone o repositório:
+## Installation
+
+1. Clone the repository:
 ```bash
 git clone https://github.com/renantrendt/clipmaster-pro.git
 ```
 
-2. Abra o Chrome e navegue até `chrome://extensions/`
-3. Ative o "Modo do desenvolvedor"
-4. Clique em "Carregar sem compactação" e selecione a pasta do projeto
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable "Developer mode"
+4. Click on "Load unpacked" and select the project folder
 
-## Desenvolvimento
+## Development
 
-### Pré-requisitos
+### Prerequisites
 - Node.js
 - npm
 
-### Configuração do ambiente
-1. Instale as dependências:
+### Environment Setup
+1. Install dependencies:
 ```bash
 npm install
 ```
 
-2. Para o servidor de desenvolvimento (opcional, apenas para recursos Pro):
+2. For the development server (optional, only for Pro features):
 ```bash
 cd server
 npm install
 npm run dev
 ```
 
-## Licença
+## License
 
-Este projeto está licenciado sob a Licença ISC - veja o arquivo [LICENSE](LICENSE) para detalhes.
+This project is licensed under the ISC License - see the LICENSE file for details.
