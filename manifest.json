@@ -6,7 +6,9 @@
   "permissions": [
     "storage",
     "clipboardRead",
-    "clipboardWrite"
+    "clipboardWrite",
+    "activeTab",
+    "scripting"
   ],
   "content_scripts": [
     {

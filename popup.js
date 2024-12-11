@@ -264,13 +264,31 @@ function createClipElement(clip, isFavorite) {
       
       // Add visual feedback
       clipElement.classList.add('clicked');
-      setTimeout(() => {
-        clipElement.classList.remove('clicked');
-      }, 200);
+      
+      // Send message to content script to paste the text
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        if (tabs[0]) {
+          await chrome.tabs.sendMessage(tabs[0].id, {
+            action: 'pasteText',
+            text: clip.text
+          });
+        }
+      });
       
       // If in recent tab, move to top
       if (currentTab === 'recent') {
         moveToTop(clip);
+      }
+      
+      // Close popup if not pinned
+      if (!isPinned) {
+        setTimeout(() => {
+          window.close();
+        }, 200); // Small delay for visual feedback
+      } else {
+        setTimeout(() => {
+          clipElement.classList.remove('clicked');
+        }, 200);
       }
     } catch (error) {
       console.error('Error copying text:', error);
