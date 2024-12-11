@@ -119,7 +119,7 @@ async function updateRecentList(recentClips, favoriteClips) {
   recentList.innerHTML = '';
   
   if (recentClips.length === 0) {
-    recentList.innerHTML = '<div class="empty-state">Nenhum clip ainda</div>';
+    recentList.innerHTML = '<div class="empty-state">Any recent clips</div>';
     return;
   }
   
@@ -257,7 +257,7 @@ function updateList(listId, clips, favoriteClips) {
   
   // Verificar se há clips para mostrar
   if (!clips || clips.length === 0) {
-    list.innerHTML = '<div class="empty-state">Nenhum clip ainda</div>';
+    list.innerHTML = '<div class="empty-state">Any favorite clips</div>';
     return;
   }
   
