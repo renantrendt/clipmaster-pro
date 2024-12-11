@@ -19,11 +19,12 @@ let favoriteClips = [];
 const DEFAULT_RECENT_LIMIT = 50;
 const DEFAULT_FAVORITES_LIMIT = 10;
 const PRO_LIMIT = 1000;
+let pinnedWindowId = null;
 
 // Inicialização
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('Popup opened');
-  initializePopup();
+  await initializePopup();
 });
 
 async function initializePopup() {
@@ -32,8 +33,31 @@ async function initializePopup() {
     setupEventListeners();
     
     // Depois, carregar os dados
-    const data = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    const data = await chrome.storage.local.get(['recentClips', 'favoriteClips', 'isPinned', 'pinnedWindowId']);
     console.log('Loaded data:', data);
+    
+    // Verificar se existe uma janela pinada
+    if (data.isPinned) {
+      const windows = await chrome.windows.getAll();
+      const pinnedWindowExists = windows.some(window => window.id === data.pinnedWindowId);
+      
+      // Se não existir, resetar o estado
+      if (!pinnedWindowExists) {
+        console.log('Pinned window not found, resetting state');
+        isPinned = false;
+        pinnedWindowId = null;
+        chrome.storage.local.set({ isPinned: false, pinnedWindowId: null });
+      } else {
+        isPinned = true;
+        pinnedWindowId = data.pinnedWindowId;
+      }
+    } else {
+      isPinned = false;
+      pinnedWindowId = null;
+    }
+    
+    // Atualizar a UI
+    updatePinButton();
     
     // Ativar a tab Recent
     const recentTab = document.querySelector('[data-tab="recent"]');
@@ -50,6 +74,9 @@ async function initializePopup() {
     // Carregar outras configurações
     await loadSettings();
     checkProStatus();
+    
+    // Verificar janela pinada
+    await checkPinnedWindow();
   } catch (error) {
     console.error('Error in popup initialization:', error);
   }
@@ -260,38 +287,43 @@ function createClipElement(clip, isFavorite) {
   // Add click handler to the whole clip item
   clipElement.addEventListener('click', async () => {
     try {
+      // Copy to clipboard
       await navigator.clipboard.writeText(clip.text);
       
       // Add visual feedback
       clipElement.classList.add('clicked');
-      
-      // Send message to content script to paste the text
-      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-        if (tabs[0]) {
-          await chrome.tabs.sendMessage(tabs[0].id, {
-            action: 'pasteText',
-            text: clip.text
-          });
-        }
-      });
       
       // If in recent tab, move to top
       if (currentTab === 'recent') {
         moveToTop(clip);
       }
       
-      // Close popup if not pinned
+      // Send message to content script to paste the text
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0]) {
+        try {
+          await chrome.tabs.sendMessage(tabs[0].id, {
+            action: 'pasteText',
+            text: clip.text
+          });
+        } catch (error) {
+          console.error('Error sending message to content script:', error);
+        }
+      }
+      
+      // Close popup if not pinned (with a small delay to ensure message is sent)
       if (!isPinned) {
         setTimeout(() => {
           window.close();
-        }, 200); // Small delay for visual feedback
+        }, 100);
       } else {
         setTimeout(() => {
           clipElement.classList.remove('clicked');
         }, 200);
       }
     } catch (error) {
-      console.error('Error copying text:', error);
+      console.error('Error handling clip click:', error);
+      clipElement.classList.remove('clicked');
     }
   });
   
@@ -338,13 +370,11 @@ function incrementMaxClips(delta) {
 
 // Carregar configurações
 async function loadSettings() {
-  const settings = await chrome.storage.local.get(['windowSize', 'isPinned', 'maxClips']);
+  const settings = await chrome.storage.local.get(['windowSize', 'maxClips']);
   if (settings.windowSize) {
     document.documentElement.style.width = settings.windowSize.width + 'px';
     document.documentElement.style.height = settings.windowSize.height + 'px';
   }
-  isPinned = settings.isPinned || false;
-  updatePinButton();
   
   // Set max clips value
   const maxClips = document.getElementById('maxClips');
@@ -352,25 +382,140 @@ async function loadSettings() {
 }
 
 // Toggle Pin
-function togglePin() {
+async function togglePin() {
+  // Check if we're in the pinned window
+  const currentWindow = await chrome.windows.getCurrent();
+  console.log('Current window:', currentWindow.id);
+  console.log('Pinned window ID:', pinnedWindowId);
+  const isCurrentWindowPinned = currentWindow.id === pinnedWindowId;
+  console.log('Is current window pinned?', isCurrentWindowPinned);
+
+  // If we're in the pinned window, just close it and reset state
+  if (isCurrentWindowPinned) {
+    console.log('Closing pinned window...');
+    isPinned = false;
+    pinnedWindowId = null;
+    
+    // Save state before closing
+    await chrome.storage.local.set({ 
+      isPinned: false,
+      pinnedWindowId: null 
+    });
+    
+    // Close the window
+    try {
+      await chrome.windows.remove(currentWindow.id);
+    } catch (error) {
+      console.error('Error closing window:', error);
+    }
+    return;
+  }
+  
   isPinned = !isPinned;
-  chrome.storage.local.set({ isPinned });
+  console.log('Toggle pin state to:', isPinned);
+  
+  // Save the state
+  chrome.storage.local.set({ isPinned }, () => {
+    console.log('Pin state saved:', isPinned);
+  });
+  
+  // Update UI
   updatePinButton();
   
   if (isPinned) {
-    document.documentElement.style.position = 'fixed';
-    document.documentElement.style.top = '0';
-    document.documentElement.style.right = '0';
-  } else {
-    document.documentElement.style.position = '';
-    document.documentElement.style.top = '';
-    document.documentElement.style.right = '';
+    try {
+      // Get screen dimensions
+      const { width: screenWidth, height: screenHeight } = window.screen;
+      
+      // Calculate initial size (50% of screen size)
+      const initialWidth = Math.max(screenWidth * 0.5, 300);
+      const initialHeight = Math.max(screenHeight * 0.7, 400);
+      
+      // Calculate position to center the window
+      const left = Math.round((screenWidth - initialWidth) / 2);
+      const top = Math.round((screenHeight - initialHeight) / 2);
+      
+      // Create new popup window
+      const newWindow = await chrome.windows.create({
+        url: chrome.runtime.getURL('popup.html'),
+        type: 'popup',
+        width: Math.round(initialWidth),
+        height: Math.round(initialHeight),
+        left: left,
+        top: top,
+        focused: true
+      });
+      
+      pinnedWindowId = newWindow.id;
+      // Save pinnedWindowId to storage
+      await chrome.storage.local.set({ pinnedWindowId });
+      window.close();
+    } catch (error) {
+      console.error('Error creating pinned window:', error);
+      isPinned = false;
+      pinnedWindowId = null;
+      await chrome.storage.local.set({ 
+        isPinned: false,
+        pinnedWindowId: null 
+      });
+      updatePinButton();
+    }
+  } else if (pinnedWindowId) {
+    try {
+      await chrome.windows.remove(pinnedWindowId);
+      pinnedWindowId = null;
+      await chrome.storage.local.set({ pinnedWindowId: null });
+    } catch (error) {
+      console.error('Error closing pinned window:', error);
+    }
   }
 }
 
-function updatePinButton() {
-  const pinBtn = document.getElementById('pinBtn');
-  pinBtn.classList.toggle('active', isPinned);
+// Listener para quando uma janela é fechada
+chrome.windows.onRemoved.addListener((windowId) => {
+  if (windowId === pinnedWindowId) {
+    console.log('Pinned window was closed');
+    // Resetar o estado
+    isPinned = false;
+    pinnedWindowId = null;
+    // Salvar o novo estado
+    chrome.storage.local.set({ 
+      isPinned: false,
+      pinnedWindowId: null 
+    }, () => {
+      console.log('Pin state reset after window close');
+    });
+  }
+});
+
+// Verificar se já existe uma janela pinada ao iniciar
+async function checkPinnedWindow() {
+  try {
+    if (!isPinned) return;
+    
+    const windows = await chrome.windows.getAll();
+    const currentWindow = await chrome.windows.getCurrent();
+    
+    // Se esta é uma janela popup e isPinned é true, atualizar pinnedWindowId
+    if (currentWindow.type === 'popup') {
+      // Verificar se a janela pinada ainda existe
+      const pinnedWindowExists = windows.some(window => window.id === pinnedWindowId);
+      if (!pinnedWindowExists) {
+        console.log('Pinned window not found in check, resetting state');
+        isPinned = false;
+        pinnedWindowId = null;
+        chrome.storage.local.set({ 
+          isPinned: false,
+          pinnedWindowId: null 
+        });
+        updatePinButton();
+      } else {
+        pinnedWindowId = currentWindow.id;
+      }
+    }
+  } catch (error) {
+    console.error('Error checking pinned window:', error);
+  }
 }
 
 // Buscar clips
@@ -626,4 +771,12 @@ function showProUpgradeModal() {
   });
   
   toggleModal('proModal', true);
+}
+
+function updatePinButton() {
+  const pinBtn = document.getElementById('pinBtn');
+  if (pinBtn) {
+    pinBtn.classList.toggle('active', isPinned);
+    pinBtn.title = isPinned ? 'Desafixar janela' : 'Fixar janela';
+  }
 }

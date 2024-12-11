@@ -5,16 +5,14 @@
   --bg-color: #fff;
   --hover-color: #f5f5f5;
   --min-width: 300px;
-  --min-height: 200px;
-  --default-width: 400px;
-  --default-height: 500px;
+  --min-height: 400px;
 }
 
 html {
   min-width: var(--min-width);
   min-height: var(--min-height);
-  width: var(--default-width);
-  height: var(--default-height);
+  width: 100vw;
+  height: 100vh;
   margin: 0;
   padding: 0;
   resize: both;
@@ -28,6 +26,8 @@ body {
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 body.pinned {
@@ -37,11 +37,12 @@ body.pinned {
 }
 
 .container {
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
   padding: 16px;
   box-sizing: border-box;
+  min-height: 0; /* Important for Firefox */
 }
 
 .header {
@@ -59,7 +60,7 @@ h1 {
 }
 
 .search-container {
-  flex-grow: 1;
+  flex: 1;
   margin-right: 16px;
 }
 
@@ -68,40 +69,46 @@ h1 {
   padding: 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 14px;
 }
 
 .header-buttons {
   display: flex;
-  gap: 4px;
-  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .header-buttons button {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 8px;
   font-size: 16px;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition: background-color 0.2s;
 }
 
 .header-buttons button:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--hover-color);
+}
+
+.header-buttons button.active {
+  background-color: var(--hover-color);
+  color: var(--primary-color);
 }
 
 #pinBtn {
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-}
-
-#pinBtn:hover {
-  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
 }
 
 #pinBtn.active {
-  opacity: 1;
-  color: #1a73e8;
+  background-color: var(--hover-color);
+  color: var(--primary-color);
+  transform: rotate(-45deg);
 }
 
 .pro-btn {
@@ -114,10 +121,10 @@ h1 {
 
 .tabs {
   display: flex;
-  margin-bottom: 16px;
   border-bottom: 1px solid #ddd;
-  flex-shrink: 0;
+  margin-bottom: 16px;
   position: relative;
+  flex-shrink: 0;
 }
 
 .tab-btn {
@@ -158,17 +165,15 @@ h1 {
 }
 
 .tab-content {
-  flex-grow: 1;
-  overflow: hidden;
-  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* Important for Firefox */
 }
 
 .clip-list {
   display: none;
   height: 100%;
   overflow-y: auto;
-  margin: 0 -16px;
-  padding: 0 16px;
 }
 
 .clip-list.active {
@@ -176,32 +181,39 @@ h1 {
 }
 
 .clip-item {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  gap: 8px;
-  background: #fff;
+  transition: all 0.2s;
+  background-color: var(--bg-color);
 }
 
 .clip-item:hover {
-  background: #f8f9fa;
+  background-color: var(--hover-color);
 }
 
 .clip-item.clicked {
-  background: #eee;
+  background-color: var(--hover-color);
   transform: scale(0.98);
 }
 
 .clip-text {
   flex: 1;
-  font-size: 13px;
-  line-height: 1.4;
-  word-break: break-word;
-  color: #333;
   margin-right: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.clip-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .favorite-btn {
@@ -386,4 +398,33 @@ h1 {
 
 #upgradeBtn:hover {
   opacity: 0.9;
+}
+
+/* Responsive font sizes */
+@media (max-width: 400px) {
+  body {
+    font-size: 14px;
+  }
+  
+  .clip-text {
+    font-size: 12px;
+  }
+  
+  .header-buttons button {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 600px) {
+  body {
+    font-size: 16px;
+  }
+  
+  .clip-text {
+    font-size: 15px;
+  }
+  
+  .header-buttons button {
+    font-size: 18px;
+  }
 }
