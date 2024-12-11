@@ -21,6 +21,8 @@ const DEFAULT_FAVORITES_LIMIT = 10;
 const PRO_LIMIT = 1000;
 let pinnedWindowId = null;
 
+let updateInterval;
+
 // Inicialização
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Popup opened');
@@ -31,6 +33,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initializeSettings();
     await checkProStatus();
     setupProHints();
+    
+    // Start polling if window is already pinned on load
+    const pinButton = document.getElementById('pinBtn');
+    if (pinButton.classList.contains('active')) {
+      startPolling();
+    }
   } catch (error) {
     console.error('Error initializing popup:', error);
   }
@@ -188,7 +196,14 @@ function setupEventListeners() {
   // Pin Button
   const pinBtn = document.getElementById('pinBtn');
   if (pinBtn) {
-    pinBtn.addEventListener('click', togglePin);
+    pinBtn.addEventListener('click', async () => {
+      await togglePin();
+      if (isPinned) {
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    });
   }
   
   // Export/Import
@@ -1034,16 +1049,22 @@ function setupProHints() {
   }
 }
 
-// Initialize when document is loaded
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await initializePopup();
-    setupEventListeners();
-    setupSettingsModal();
-    await initializeSettings();
-    await checkProStatus();
-    setupProHints();
-  } catch (error) {
-    console.error('Error initializing popup:', error);
+// Start polling when window is pinned
+function startPolling() {
+  if (updateInterval) return;
+  console.log('Starting clip polling...');
+  updateInterval = setInterval(async () => {
+    const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    updateRecentList(recentClips, favoriteClips);
+    updateList('favoritesList', favoriteClips, favoriteClips);
+  }, 1000); // Check every second
+}
+
+// Stop polling when window is unpinned
+function stopPolling() {
+  if (updateInterval) {
+    console.log('Stopping clip polling...');
+    clearInterval(updateInterval);
+    updateInterval = null;
   }
-});
+}
