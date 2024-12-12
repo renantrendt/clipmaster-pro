@@ -558,7 +558,7 @@ async function performSearch(useSemanticSearch = false) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzcWpkZnhzYmdkbG1paGJ6bWNyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMzk4Mjg5NywiZXhwIjoyMDQ5NTU4ODk3fQ.NxmppFW9TXx8R5tPxUkEHUm3qEdVFpeGzyGgtF5_KUQ',
+            'Authorization': 'Bearer ' + process.env.SUPABASE_ANON_KEY,
             'Origin': chrome.runtime.getURL('')
           },
           body: JSON.stringify({
