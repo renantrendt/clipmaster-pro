@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initializeSettings();
     await checkProStatus();
     setupProHints();
+    await updateProButton();
     
     // Start polling if window is already pinned on load
     const pinButton = document.getElementById('pinBtn');
@@ -159,7 +160,11 @@ function setupEventListeners() {
 
   const proBtn = document.getElementById('proBtn');
   if (proBtn) {
-    proBtn.addEventListener('click', () => toggleModal('proModal', true));
+    proBtn.addEventListener('click', async () => {
+      const { isPro } = await chrome.storage.local.get(['isPro']);
+      const modalId = isPro ? 'proStatusModal' : 'proModal';
+      toggleModal(modalId, true);
+    });
   }
   
   // Close buttons for modals
@@ -183,14 +188,6 @@ function setupEventListeners() {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) {
     searchInput.addEventListener('input', debounce(() => performSearch(false), 300));
-    searchInput.addEventListener('click', async () => {
-      const { isPro } = await chrome.storage.local.get(['isPro']);
-      if (!isPro) {
-        searchInput.blur(); // Remove focus from search input
-        const proModal = document.getElementById('proModal');
-        if (proModal) proModal.style.display = 'block';
-      }
-    });
   }
   
   // Pin Button
@@ -219,18 +216,14 @@ function setupEventListeners() {
   
   const aiSearchBtn = document.getElementById('aiSearchBtn');
   aiSearchBtn.addEventListener('click', async () => {
-    const query = searchInput.value.trim();
-    if (!query) return;
-    
-    aiSearchBtn.disabled = true;
-    const originalEmoji = aiSearchBtn.textContent;
-    aiSearchBtn.textContent = '🔄';
-    
-    try {
-      await performSearch(true);
-    } finally {
-      aiSearchBtn.disabled = false;
-      aiSearchBtn.textContent = originalEmoji;
+    const { isPro } = await chrome.storage.local.get(['isPro']);
+    if (!isPro) {
+      toggleModal('proModal', true);
+      return;
+    }
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.value) {
+      performSearch(true);
     }
   });
 }
@@ -540,43 +533,80 @@ async function checkPinnedWindow() {
 // Buscar clips
 async function performSearch(useSemanticSearch = false) {
   const searchInput = document.getElementById('searchInput');
-  const query = searchInput.value.trim();
+  const query = searchInput.value.trim().toLowerCase();
+  
+  if (!query) {
+    await loadClips();
+    return;
+  }
 
-  try {
-    const data = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    const recentClips = data.recentClips || [];
-    const favoriteClips = data.favoriteClips || [];
-    const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-    let clips = activeTab === 'recent' ? recentClips : favoriteClips;
-
-    if (query) {
-      if (useSemanticSearch) {
-        const { data: semanticData, error } = await supabase.functions.invoke('semantic-search', {
-          body: { 
-            query, 
-            clips: clips.map(clip => clip.text)
-          }
+  let filteredClips;
+  
+  if (useSemanticSearch) {
+    try {
+      const { recentClips, favoriteClips } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+      const allClips = [...(recentClips || []), ...(favoriteClips || [])].map(clip => clip.text);
+      
+      // Show loading state
+      const aiSearchBtn = document.getElementById('aiSearchBtn');
+      const originalEmoji = aiSearchBtn.textContent;
+      aiSearchBtn.textContent = '🔄';
+      aiSearchBtn.disabled = true;
+      
+      try {
+        const response = await fetch('https://vsqjdfxsbgdlmihbzmcr.supabase.co/functions/v1/semantic-search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzcWpkZnhzYmdkbG1paGJ6bWNyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczMzk4Mjg5NywiZXhwIjoyMDQ5NTU4ODk3fQ.NxmppFW9TXx8R5tPxUkEHUm3qEdVFpeGzyGgtF5_KUQ',
+            'Origin': chrome.runtime.getURL('')
+          },
+          body: JSON.stringify({
+            query,
+            clips: allClips
+          })
         });
 
-        if (error) throw error;
-        clips = semanticData.matches.map(match => clips[match.index]);
-      } else {
-        clips = clips.filter(clip => 
-          clip.text.toLowerCase().includes(query.toLowerCase())
-        );
-      }
-    }
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Semantic search error:', errorText);
+          throw new Error('Semantic search failed: ' + errorText);
+        }
 
-    if (activeTab === 'recent') {
-      updateList('recentList', clips, favoriteClips);
-    } else {
-      updateList('favoritesList', clips, favoriteClips);
+        const data = await response.json();
+        console.log('Semantic search response:', data);
+        
+        if (!data.results || !Array.isArray(data.results)) {
+          console.error('Response format:', data);
+          throw new Error('Invalid response format');
+        }
+
+        // Filter clips based on results
+        filteredClips = recentClips.filter((clip, index) => 
+          data.results.includes(clip.text)
+        );
+      } finally {
+        // Restore button state
+        aiSearchBtn.textContent = originalEmoji;
+        aiSearchBtn.disabled = false;
+      }
+    } catch (error) {
+      console.error('Error performing semantic search:', error);
+      // Fallback to normal search
+      const { recentClips } = await chrome.storage.local.get(['recentClips']);
+      filteredClips = (recentClips || []).filter(clip => 
+        clip.text.toLowerCase().includes(query)
+      );
     }
-  } catch (error) {
-    console.error('Error updating list:', error);
-    const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-    updateList(activeTab === 'recent' ? 'recentList' : 'favoritesList', [], []);
+  } else {
+    const { recentClips } = await chrome.storage.local.get(['recentClips']);
+    filteredClips = (recentClips || []).filter(clip => 
+      clip.text.toLowerCase().includes(query)
+    );
   }
+
+  const { favoriteClips } = await chrome.storage.local.get(['favoriteClips']);
+  updateRecentList(filteredClips, favoriteClips || []);
 }
 
 // Salvar configurações
@@ -744,7 +774,7 @@ async function startCheckout() {
   
   // Atualizar UI
   document.getElementById('proModal').style.display = 'none';
-  document.getElementById('proBtn').style.display = 'none';
+  await updateProButton();
   
   // Remover hints Pro
   document.querySelectorAll('.pro-hint').forEach(hint => {
@@ -769,7 +799,7 @@ async function checkProStatus() {
   isPro = data.isPro || false;
   
   if (isPro) {
-    document.getElementById('proBtn').style.display = 'none';
+    await updateProButton();
     document.querySelectorAll('.pro-hint').forEach(hint => {
       hint.style.display = 'none';
     });
@@ -797,6 +827,14 @@ function showProUpgradeModal() {
         await startCheckout();
       });
     }
+  }
+}
+
+async function updateProButton() {
+  const { isPro } = await chrome.storage.local.get(['isPro']);
+  const proBtn = document.getElementById('proBtn');
+  if (proBtn) {
+    proBtn.style.color = isPro ? '#f4b400' : '#9ca3af';
   }
 }
 
@@ -924,6 +962,7 @@ function setupProHints() {
   if (upgradeBtn) {
     upgradeBtn.addEventListener('click', async () => {
       await startCheckout();
+      await updateProButton();
     });
   }
 
@@ -963,3 +1002,32 @@ function stopPolling() {
     updateInterval = null;
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const proModal = document.getElementById('proModal');
+  const closeBtn = proModal.querySelector('.close-btn');
+  const upgradeBtn = document.getElementById('upgradeBtn');
+
+  closeBtn.addEventListener('click', () => {
+    proModal.style.display = 'none';
+  });
+
+  upgradeBtn.addEventListener('click', async () => {
+    await chrome.storage.local.set({ isPro: true });
+    proModal.style.display = 'none';
+    await updateProButton();
+    
+    // Se tiver texto no campo de busca, fazer a busca semântica automaticamente
+    const searchInput = document.getElementById('searchInput');
+    const aiSearchBtn = document.getElementById('aiSearchBtn');
+    if (searchInput.value.trim()) {
+      aiSearchBtn.click();
+    }
+  });
+
+  window.addEventListener('click', (event) => {
+    if (event.target === proModal) {
+      proModal.style.display = 'none';
+    }
+  });
+});
