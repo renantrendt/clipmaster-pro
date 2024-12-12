@@ -291,6 +291,25 @@ h1 {
   color: #666;
 }
 
+.ai-search-btn {
+  background-color: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  padding: 4px 8px;
+}
+
+.ai-search-btn:hover {
+  background-color: #4f46e5;
+}
+
+.ai-search-btn:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
 /* Modal Styles */
 .modal {
   display: none;

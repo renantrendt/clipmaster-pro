@@ -182,6 +182,7 @@ function setupEventListeners() {
   // Search input
   const searchInput = document.getElementById('searchInput');
   if (searchInput) {
+    searchInput.addEventListener('input', debounce(() => performSearch(false), 300));
     searchInput.addEventListener('click', async () => {
       const { isPro } = await chrome.storage.local.get(['isPro']);
       if (!isPro) {
@@ -190,7 +191,6 @@ function setupEventListeners() {
         if (proModal) proModal.style.display = 'block';
       }
     });
-    searchInput.addEventListener('input', debounce(handleSearch, 300));
   }
   
   // Pin Button
@@ -216,6 +216,23 @@ function setupEventListeners() {
   if (importBtn) {
     importBtn.addEventListener('click', importFavorites);
   }
+  
+  const aiSearchBtn = document.getElementById('aiSearchBtn');
+  aiSearchBtn.addEventListener('click', async () => {
+    const query = searchInput.value.trim();
+    if (!query) return;
+    
+    aiSearchBtn.disabled = true;
+    const originalEmoji = aiSearchBtn.textContent;
+    aiSearchBtn.textContent = '🔄';
+    
+    try {
+      await performSearch(true);
+    } finally {
+      aiSearchBtn.disabled = false;
+      aiSearchBtn.textContent = originalEmoji;
+    }
+  });
 }
 
 // Alternar entre abas
@@ -260,7 +277,7 @@ async function loadClips() {
 }
 
 // Atualizar lista
-function updateList(listId, clips, favoriteClips) {
+async function updateList(listId, clips, favoriteClips) {
   const list = document.getElementById(listId);
   if (!list) {
     console.error(`List element ${listId} not found`);
@@ -272,7 +289,7 @@ function updateList(listId, clips, favoriteClips) {
   
   // Verificar se há clips para mostrar
   if (!clips || clips.length === 0) {
-    list.innerHTML = '<div class="empty-state">Any favorite clips</div>';
+    list.innerHTML = '<div class="empty-state">No clip found. Try to click on the 🔍 button to use AI search.</div>';
     return;
   }
   
@@ -521,21 +538,45 @@ async function checkPinnedWindow() {
 }
 
 // Buscar clips
-function handleSearch(e) {
-  const searchTerm = e.target.value.toLowerCase();
-  const lists = currentTab === 'recent' ? ['recentList'] : ['favoritesList'];
-  
-  lists.forEach(async listId => {
-    const storageKey = listId === 'recentList' ? 'recentClips' : 'favoriteClips';
-    const data = await chrome.storage.local.get([storageKey]);
-    const clips = data[storageKey] || [];
-    
-    const filteredClips = clips.filter(clip => 
-      clip.text.toLowerCase().includes(searchTerm)
-    );
-    
-    updateList(listId, filteredClips, data.favoriteClips || []);
-  });
+async function performSearch(useSemanticSearch = false) {
+  const searchInput = document.getElementById('searchInput');
+  const query = searchInput.value.trim();
+
+  try {
+    const data = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    const recentClips = data.recentClips || [];
+    const favoriteClips = data.favoriteClips || [];
+    const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+    let clips = activeTab === 'recent' ? recentClips : favoriteClips;
+
+    if (query) {
+      if (useSemanticSearch) {
+        const { data: semanticData, error } = await supabase.functions.invoke('semantic-search', {
+          body: { 
+            query, 
+            clips: clips.map(clip => clip.text)
+          }
+        });
+
+        if (error) throw error;
+        clips = semanticData.matches.map(match => clips[match.index]);
+      } else {
+        clips = clips.filter(clip => 
+          clip.text.toLowerCase().includes(query.toLowerCase())
+        );
+      }
+    }
+
+    if (activeTab === 'recent') {
+      updateList('recentList', clips, favoriteClips);
+    } else {
+      updateList('favoritesList', clips, favoriteClips);
+    }
+  } catch (error) {
+    console.error('Error updating list:', error);
+    const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+    updateList(activeTab === 'recent' ? 'recentList' : 'favoritesList', [], []);
+  }
 }
 
 // Salvar configurações
@@ -631,27 +672,6 @@ function updateSearchState() {
   searchInput.title = isPro ? 'Buscar em seus clips' : 'Disponível apenas na versão Pro';
 }
 
-// Funcionalidades Pro
-async function handleSearch(e) {
-  if (!isPro) return;
-  
-  const query = e.target.value.toLowerCase();
-  if (!query) {
-    updateUI();
-    return;
-  }
-
-  const filteredRecent = recentClips.filter(clip => 
-    clip.text.toLowerCase().includes(query)
-  );
-  const filteredFavorites = favoriteClips.filter(clip =>
-    clip.text.toLowerCase().includes(query)
-  );
-
-  updateList('recentList', filteredRecent, favoriteClips);
-  updateList('favoritesList', filteredFavorites, favoriteClips);
-}
-
 // Import/Export
 function exportFavorites() {
   const data = JSON.stringify(favoriteClips);
@@ -711,76 +731,73 @@ function showSettings() {
 
 // Stripe Integration
 async function startCheckout() {
-  try {
-    const response = await fetch('http://localhost:3000/create-checkout-session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-    
-    const session = await response.json();
-    
-    // Redirecionar para o Checkout do Stripe
-    const stripe = Stripe('sua_chave_publica_stripe');
-    const result = await stripe.redirectToCheckout({
-      sessionId: session.id
-    });
-    
-    if (result.error) {
-      alert('Erro ao iniciar checkout: ' + result.error.message);
-    }
-  } catch (error) {
-    alert('Erro ao processar pagamento: ' + error.message);
+  // Ativar features Pro localmente
+  isPro = true;
+  await chrome.storage.local.set({ isPro: true });
+  
+  // Atualizar limites
+  const settings = {
+    maxClips: PRO_LIMIT,
+    maxFavorites: PRO_LIMIT
+  };
+  await chrome.storage.local.set(settings);
+  
+  // Atualizar UI
+  document.getElementById('proModal').style.display = 'none';
+  document.getElementById('proBtn').style.display = 'none';
+  
+  // Remover hints Pro
+  document.querySelectorAll('.pro-hint').forEach(hint => {
+    hint.style.display = 'none';
+  });
+  
+  // Habilitar busca
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.disabled = false;
+    searchInput.title = 'Buscar em seus clips';
   }
+  
+  // Atualizar UI
+  await loadSettings();
+  updateUI();
 }
 
 // Verificar status Pro
 async function checkProStatus() {
-  try {
-    const response = await fetch('http://localhost:3000/api/check-pro', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
-    }).catch(() => ({ ok: false }));
-
-    if (!response.ok) {
-      console.log('Pro status check failed, defaulting to free user');
-      return false;
+  const data = await chrome.storage.local.get(['isPro']);
+  isPro = data.isPro || false;
+  
+  if (isPro) {
+    document.getElementById('proBtn').style.display = 'none';
+    document.querySelectorAll('.pro-hint').forEach(hint => {
+      hint.style.display = 'none';
+    });
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.disabled = false;
+      searchInput.title = 'Buscar em seus clips';
     }
-
-    const data = await response.json();
-    return data.isPro || false;
-  } catch (error) {
-    console.log('Error checking pro status, defaulting to free user:', error);
-    return false;
   }
+  
+  return isPro;
 }
 
 // Show Pro upgrade modal
 function showProUpgradeModal() {
-  const modal = document.getElementById('proModal');
-  const content = modal.querySelector('.pro-features');
-  
-  content.innerHTML = `
-    <h3>Upgrade to Pro!</h3>
-    <p>You've reached the free plan limit. Upgrade to Pro to enjoy:</p>
-    <ul>
-      <li>✨ Unlimited recent clips</li>
-      <li>⭐ Unlimited favorites</li>
-      <li>🔍 AI-powered semantic search</li>
-      <li>🚀 Premium support</li>
-    </ul>
-    <button id="upgradeBtn" class="primary-btn">Upgrade Now - Only $4.99/month</button>
-  `;
-  
-  const upgradeBtn = content.querySelector('#upgradeBtn');
-  upgradeBtn.addEventListener('click', () => {
-    window.open('http://localhost:3000/checkout', '_blank');
-  });
-  
-  toggleModal('proModal', true);
+  const proModal = document.getElementById('proModal');
+  if (proModal) {
+    proModal.style.display = 'block';
+    
+    // Configurar o botão de upgrade
+    const upgradeBtn = proModal.querySelector('#upgradeBtn');
+    if (upgradeBtn) {
+      upgradeBtn.addEventListener('click', async () => {
+        await startCheckout();
+      });
+    }
+  }
 }
 
 function updatePinButton() {
@@ -803,206 +820,38 @@ function toggleModal(modalId, show) {
   }
 }
 
-// Settings Modal
+// Setup settings modal
 function setupSettingsModal() {
   const settingsBtn = document.getElementById('settingsBtn');
   const settingsModal = document.getElementById('settingsModal');
   const closeBtn = settingsModal?.querySelector('.close-btn');
   const saveBtn = document.getElementById('saveSettingsBtn');
-  const maxClipsInput = document.getElementById('maxClips');
-  const maxFavoritesInput = document.getElementById('maxFavorites');
-  const proHint = document.querySelector('.pro-hint');
-
-  // Only proceed if we have all required elements
-  if (!settingsBtn || !settingsModal || !closeBtn || !saveBtn || !maxClipsInput || !maxFavoritesInput) {
-    console.error('Settings elements not found');
-    return;
-  }
-
-  // Open settings modal
-  settingsBtn.addEventListener('click', async () => {
-    try {
-      const { isPro, maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
-        await chrome.storage.local.get(['isPro', 'maxClips', 'maxFavorites']);
-      
-      maxClipsInput.max = isPro ? '1000' : '50';
-      maxClipsInput.value = maxClips;
-      
-      maxFavoritesInput.max = isPro ? '1000' : '5';
-      maxFavoritesInput.value = maxFavorites;
-      
-      settingsModal.style.display = 'block';
-      maxClipsInput.focus();
-    } catch (error) {
-      console.error('Error opening settings:', error);
-    }
-  });
-
-  // Pro hint click
-  if (proHint) {
-    proHint.addEventListener('click', () => {
-      settingsModal.style.display = 'none';
-      const proModal = document.getElementById('proModal');
-      if (proModal) proModal.style.display = 'block';
-    });
-  }
-
-  // Close settings modal
-  closeBtn.addEventListener('click', () => {
-    settingsModal.style.display = 'none';
-  });
-
-  // Close modal when clicking outside
-  window.addEventListener('click', (event) => {
-    if (event.target === settingsModal) {
-      settingsModal.style.display = 'none';
-    }
-  });
-
-  function updateMaxClipsValue(change) {
-    const currentValue = parseInt(maxClipsInput.value) || DEFAULT_RECENT_LIMIT;
-    const min = parseInt(maxClipsInput.min) || 10;
-    const max = parseInt(maxClipsInput.max) || 50;
-    const newValue = currentValue + change;
-    
-    if (newValue >= min && newValue <= max) {
-      maxClipsInput.value = newValue;
-    }
-  }
-
-  // Keyboard controls for max clips
-  maxClipsInput.addEventListener('keydown', (event) => {
-    switch(event.key) {
-      case 'ArrowUp':
-        event.preventDefault();
-        updateMaxClipsValue(10);
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        updateMaxClipsValue(-10);
-        break;
-      case 'Enter':
-        event.preventDefault();
-        saveBtn.click();
-        break;
-      case 'Escape':
-        event.preventDefault();
-        settingsModal.style.display = 'none';
-        break;
-    }
-  });
-
-  function updateMaxFavoritesValue(change) {
-    const currentValue = parseInt(maxFavoritesInput.value) || 5;
-    const min = parseInt(maxFavoritesInput.min) || 1;
-    const max = parseInt(maxFavoritesInput.max) || 5;
-    const newValue = currentValue + change;
-    
-    if (newValue >= min && newValue <= max) {
-      maxFavoritesInput.value = newValue;
-    }
-  }
-
-  // Keyboard controls for max favorites
-  maxFavoritesInput.addEventListener('keydown', (event) => {
-    switch(event.key) {
-      case 'ArrowUp':
-        event.preventDefault();
-        updateMaxFavoritesValue(1);
-        break;
-      case 'ArrowDown':
-        event.preventDefault();
-        updateMaxFavoritesValue(-1);
-        break;
-      case 'Enter':
-        event.preventDefault();
-        saveBtn.click();
-        break;
-      case 'Escape':
-        event.preventDefault();
-        settingsModal.style.display = 'none';
-        break;
-    }
-  });
-
-  // Save settings
-  saveBtn.addEventListener('click', async () => {
-    try {
-      const maxClips = parseInt(maxClipsInput.value) || DEFAULT_RECENT_LIMIT;
-      const maxFavorites = parseInt(maxFavoritesInput.value) || 5;
-      const { isPro } = await chrome.storage.local.get(['isPro']);
-      
-      // Validate limits for free users
-      if (!isPro) {
-        if (maxClips > 50) {
-          maxClipsInput.value = 50;
-          const proModal = document.getElementById('proModal');
-          if (proModal) proModal.style.display = 'block';
-          return;
-        }
-        if (maxFavorites > 5) {
-          maxFavoritesInput.value = 5;
-          const proModal = document.getElementById('proModal');
-          if (proModal) proModal.style.display = 'block';
-          return;
-        }
-      }
-      
-      // Save the new settings
-      await chrome.storage.local.set({ maxClips, maxFavorites });
-      
-      // Trim both lists if needed
-      recentClips = recentClips.slice(0, maxClips);
-      favoriteClips = favoriteClips.slice(0, maxFavorites);
-      
-      // Save and update UI
-      await saveClips();
-      updateRecentList(recentClips, favoriteClips);
-      updateList('favoritesList', favoriteClips, favoriteClips);
-      
-      settingsModal.style.display = 'none';
-    } catch (error) {
-      console.error('Error saving settings:', error);
-    }
-  });
-}
-
-// Initialize settings
-async function initializeSettings() {
-  const { maxClips = 50, maxFavorites = 5 } = await chrome.storage.local.get(['maxClips', 'maxFavorites']);
-  
-  const maxClipsInput = document.getElementById('maxClips');
-  if (maxClipsInput) {
-    maxClipsInput.value = maxClips;
-  }
-
-  const maxFavoritesInput = document.getElementById('maxFavorites');
-  if (maxFavoritesInput) {
-    maxFavoritesInput.value = maxFavorites;
-  }
-}
-
-// Check pro status
-async function checkProStatus() {
-  try {
-    const response = await fetch('http://localhost:3000/api/check-pro');
-    const data = await response.json();
-    return data.isPro;
-  } catch (error) {
-    console.error('Error checking pro status:', error);
-    return false;
-  }
-}
-
-// Setup settings modal
-function setupSettingsModal() {
-  const settingsBtn = document.getElementById('settingsBtn');
-  const settingsModal = document.getElementById('settingsModal');
-  const closeBtn = document.querySelector('.close-btn');
-  const saveBtn = document.getElementById('saveSettingsBtn');
 
   if (settingsBtn) {
-    settingsBtn.addEventListener('click', () => {
+    settingsBtn.addEventListener('click', async () => {
+      const data = await chrome.storage.local.get(['isPro']);
+      const isPro = data.isPro || false;
+      
+      // Atualizar limites baseado no status Pro
+      const maxClipsInput = document.getElementById('maxClips');
+      const maxFavoritesInput = document.getElementById('maxFavorites');
+      
+      if (isPro) {
+        if (maxClipsInput) {
+          maxClipsInput.max = PRO_LIMIT;
+          maxClipsInput.removeAttribute('disabled');
+        }
+        if (maxFavoritesInput) {
+          maxFavoritesInput.max = PRO_LIMIT;
+          maxFavoritesInput.removeAttribute('disabled');
+        }
+        
+        // Esconder dicas Pro
+        document.querySelectorAll('.pro-hint').forEach(hint => {
+          hint.style.display = 'none';
+        });
+      }
+      
       settingsModal.style.display = 'block';
     });
   }
@@ -1015,14 +864,52 @@ function setupSettingsModal() {
 
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
-      const maxClips = parseInt(document.getElementById('maxClips').value) || 50;
-      const maxFavorites = parseInt(document.getElementById('maxFavorites').value) || 5;
+      const maxClipsInput = document.getElementById('maxClips');
+      const maxFavoritesInput = document.getElementById('maxFavorites');
       
-      await chrome.storage.local.set({ maxClips, maxFavorites });
+      const settings = {
+        maxClips: parseInt(maxClipsInput.value) || DEFAULT_RECENT_LIMIT,
+        maxFavorites: parseInt(maxFavoritesInput.value) || DEFAULT_FAVORITES_LIMIT
+      };
+      
+      await chrome.storage.local.set(settings);
       settingsModal.style.display = 'none';
       
-      // Refresh clips display
+      // Atualizar a UI
       await loadClips();
+    });
+  }
+}
+
+// Initialize settings
+async function initializeSettings() {
+  const data = await chrome.storage.local.get(['maxClips', 'maxFavorites', 'isPro']);
+  const isPro = data.isPro || false;
+  const maxLimit = isPro ? PRO_LIMIT : DEFAULT_RECENT_LIMIT;
+  const maxFavLimit = isPro ? PRO_LIMIT : DEFAULT_FAVORITES_LIMIT;
+  
+  const maxClipsInput = document.getElementById('maxClips');
+  if (maxClipsInput) {
+    maxClipsInput.value = data.maxClips || DEFAULT_RECENT_LIMIT;
+    maxClipsInput.max = maxLimit;
+    if (isPro) {
+      maxClipsInput.removeAttribute('disabled');
+    }
+  }
+
+  const maxFavoritesInput = document.getElementById('maxFavorites');
+  if (maxFavoritesInput) {
+    maxFavoritesInput.value = data.maxFavorites || DEFAULT_FAVORITES_LIMIT;
+    maxFavoritesInput.max = maxFavLimit;
+    if (isPro) {
+      maxFavoritesInput.removeAttribute('disabled');
+    }
+  }
+  
+  // Esconder as dicas Pro se o usuário for Pro
+  if (isPro) {
+    document.querySelectorAll('.pro-hint').forEach(hint => {
+      hint.style.display = 'none';
     });
   }
 }
@@ -1031,6 +918,14 @@ function setupSettingsModal() {
 function setupProHints() {
   const proHints = document.querySelectorAll('.pro-hint');
   const proModal = document.getElementById('proModal');
+  const upgradeBtn = document.getElementById('upgradeBtn');
+
+  // Event listener para o botão de upgrade
+  if (upgradeBtn) {
+    upgradeBtn.addEventListener('click', async () => {
+      await startCheckout();
+    });
+  }
 
   proHints.forEach(hint => {
     hint.addEventListener('click', () => {
@@ -1040,7 +935,7 @@ function setupProHints() {
     });
   });
 
-  // Setup close button for pro modal
+  // Event listener para o botão de fechar
   const closeBtn = proModal?.querySelector('.close-btn');
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
