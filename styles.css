@@ -303,36 +303,28 @@ h1 {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
+  padding: 20px;
   text-align: center;
-  color: var(--secondary-color);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  box-sizing: border-box;
+  color: var(--text-color);
+  height: 200px;
 }
 
-.empty-state svg {
-  margin-bottom: 16px;
-  color: #71717a;
-  width: 24px;
-  height: 24px;
+.empty-state-title {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
-.empty-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--primary-color);
-  margin: 0 0 4px 0;
-}
-
-.empty-description {
-  font-size: 13px;
-  color: var(--secondary-color);
-  margin: 0;
+.empty-state-description {
+  font-size: 0.9em;
   opacity: 0.8;
+  margin-bottom: 12px;
+}
+
+.empty-state-suggestion {
+  font-size: 0.9em;
+  opacity: 0.7;
+  margin-top: 8px;
 }
 
 .clip-list:empty::after {

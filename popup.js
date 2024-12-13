@@ -128,7 +128,7 @@ async function updateRecentList(recentClips, favoriteClips) {
   recentList.innerHTML = '';
   
   if (recentClips.length === 0) {
-    recentList.innerHTML = '<div class="empty-state">Any recent clips</div>';
+    showEmptyState(false);
     return;
   }
   
@@ -229,7 +229,7 @@ function setupEventListeners() {
 }
 
 // Alternar entre abas
-function switchTab(tab) {
+async function switchTab(tab) {
   if (!tab) return;
   
   // Update current tab
@@ -247,7 +247,28 @@ function switchTab(tab) {
   if (selectedTab && selectedList) {
     selectedTab.classList.add('active');
     selectedList.classList.add('active');
-    loadClips(); // Reload clips when switching tabs
+    
+    // Check if there's an active search
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.value.trim()) {
+      // If there's a search query, perform the search in the new tab
+      performSearch(false);
+    } else {
+      // If no search, load all clips
+      const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
+        await chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips', 'maxFavorites']);
+      
+      // Ensure we don't exceed the limits
+      recentClips = savedRecent.slice(0, maxClips);
+      favoriteClips = savedFavorites.slice(0, maxFavorites);
+      
+      // Update only the active list
+      if (tab === 'recent') {
+        updateRecentList(recentClips, favoriteClips);
+      } else if (tab === 'favorites') {
+        updateList('favoritesList', favoriteClips, favoriteClips);
+      }
+    }
   }
 }
 
@@ -282,7 +303,7 @@ async function updateList(listId, clips, favoriteClips) {
   
   // Verificar se há clips para mostrar
   if (!clips || clips.length === 0) {
-    list.innerHTML = '<div class="empty-state">No clip found. Try to click on the 🔍 button to use AI search.</div>';
+    showEmptyState(false);
     return;
   }
   
@@ -531,82 +552,59 @@ async function checkPinnedWindow() {
 }
 
 // Buscar clips
-async function performSearch(useSemanticSearch = false) {
+async function performSearch(isSemanticSearch = false) {
   const searchInput = document.getElementById('searchInput');
   const query = searchInput.value.trim().toLowerCase();
   
+  // If search is empty, show all clips
   if (!query) {
-    await loadClips();
+    const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [] } = 
+      await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    
+    if (currentTab === 'recent') {
+      updateRecentList(savedRecent, favoriteClips);
+    } else {
+      updateList('favoritesList', savedFavorites, favoriteClips);
+    }
     return;
   }
 
-  let filteredClips;
-  
-  if (useSemanticSearch) {
-    try {
-      const { recentClips, favoriteClips } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-      const allClips = [...(recentClips || []), ...(favoriteClips || [])].map(clip => clip.text);
-      
-      // Show loading state
-      const aiSearchBtn = document.getElementById('aiSearchBtn');
-      const originalEmoji = aiSearchBtn.textContent;
-      aiSearchBtn.textContent = '🔄';
-      aiSearchBtn.disabled = true;
-      
-      try {
-        const response = await fetch('https://vsqjdfxsbgdlmihbzmcr.supabase.co/functions/v1/semantic-search', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + process.env.SUPABASE_ANON_KEY,
-            'Origin': chrome.runtime.getURL('')
-          },
-          body: JSON.stringify({
-            query,
-            clips: allClips
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Semantic search error:', errorText);
-          throw new Error('Semantic search failed: ' + errorText);
-        }
-
-        const data = await response.json();
-        console.log('Semantic search response:', data);
-        
-        if (!data.results || !Array.isArray(data.results)) {
-          console.error('Response format:', data);
-          throw new Error('Invalid response format');
-        }
-
-        // Filter clips based on results
-        filteredClips = recentClips.filter((clip, index) => 
-          data.results.includes(clip.text)
-        );
-      } finally {
-        // Restore button state
-        aiSearchBtn.textContent = originalEmoji;
-        aiSearchBtn.disabled = false;
+  try {
+    let searchResults = [];
+    const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [] } = 
+      await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    
+    // Determine which clips to search based on current tab
+    const clipsToSearch = currentTab === 'recent' ? savedRecent : savedFavorites;
+    
+    if (isSemanticSearch) {
+      searchResults = await performSemanticSearch(query, clipsToSearch);
+      if (searchResults.length === 0) {
+        showEmptyState(true);
+        return;
       }
-    } catch (error) {
-      console.error('Error performing semantic search:', error);
-      // Fallback to normal search
-      const { recentClips } = await chrome.storage.local.get(['recentClips']);
-      filteredClips = (recentClips || []).filter(clip => 
+    } else {
+      searchResults = clipsToSearch.filter(clip => 
         clip.text.toLowerCase().includes(query)
       );
+      
+      if (searchResults.length === 0) {
+        showEmptyState(false);
+        return;
+      }
     }
-  } else {
-    const { recentClips } = await chrome.storage.local.get(['recentClips']);
-    filteredClips = (recentClips || []).filter(clip => 
-      clip.text.toLowerCase().includes(query)
-    );
+    
+    // Update the appropriate list based on current tab
+    if (currentTab === 'recent') {
+      updateRecentList(searchResults, favoriteClips);
+    } else {
+      updateList('favoritesList', searchResults, favoriteClips);
+    }
+    
+  } catch (error) {
+    console.error('Search error:', error);
+    showEmptyState(isSemanticSearch);
   }
-
-  const { favoriteClips } = await chrome.storage.local.get(['favoriteClips']);
-  updateRecentList(filteredClips, favoriteClips || []);
 }
 
 // Salvar configurações
@@ -700,6 +698,24 @@ function updateSearchState() {
   const searchInput = document.getElementById('searchInput');
   searchInput.disabled = !isPro;
   searchInput.title = isPro ? 'Buscar em seus clips' : 'Disponível apenas na versão Pro';
+}
+
+function showEmptyState(isSemanticSearch) {
+  const list = document.querySelector(`.clip-list[data-tab="${currentTab}"]`);
+  if (!list) return;
+
+  const title = isSemanticSearch ? 'No similar clips found' : 'No clips found';
+  const description = isSemanticSearch 
+    ? 'Try a different search term or check your recent clips'
+    : 'Try a different search term';
+
+  list.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-state-title">${title}</div>
+      <div class="empty-state-description">${description}</div>
+      ${isSemanticSearch ? '' : '<div class="empty-state-suggestion">Click on the 🔍 button to use AI search</div>'}
+    </div>
+  `;
 }
 
 // Import/Export
