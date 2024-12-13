@@ -77,7 +77,7 @@ This document provides a comprehensive technical overview of ClipMaster Pro, det
 
 2. **Semantic Search (Pro)**
    - Uses Supabase Edge Functions
-   - Embeddings via OpenAI API
+   - Embeddings via Claude API
    - Results sorted by similarity score
    - Fallback to basic search on error
 
@@ -220,17 +220,5 @@ extension/
    - `checkProStatus()`: Verify pro status
    - `performSemanticSearch()`: AI search
    - `setupProFeatures()`: Initialize pro features
-
-## Future Improvements
-1. **Code Optimization**
-   - Implement virtual scrolling for large lists
-   - Optimize storage operations
-   - Improve search performance
-
-2. **Feature Ideas**
-   - Folder organization
-   - Tags system
-   - Cloud sync
-   - Sharing capabilities
 
 This documentation serves as a comprehensive guide for understanding the technical implementation and business rules of ClipMaster Pro. AI agents can use this information to make informed decisions about code improvements and feature additions while maintaining the existing functionality and user experience.
