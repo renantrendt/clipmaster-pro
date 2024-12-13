@@ -11,9 +11,15 @@
         <input type="text" id="searchInput" placeholder="Search clips...">
       </div>
       <div class="header-buttons">
-        <button id="aiSearchBtn" class="ai-search-btn" title="AI Search">🔍</button>
-        <button id="settingsBtn" title="Configurações">⚙️</button>
-        <button id="pinBtn" title="Fixar janela">📌</button>
+        <button id="aiSearchBtn" class="ai-search-btn" title="AI Search">
+          <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+        <button id="settingsBtn" title="Configurações">
+          <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+        <button id="pinBtn" title="Fixar janela">
+          <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22"></path><path d="M2 12L22 12"></path></svg>
+        </button>
         <button id="proBtn" class="pro-btn" title="Upgrade para Pro">Pro</button>
       </div>
     </div>
@@ -25,8 +31,36 @@
     </nav>
 
     <div class="tab-content">
-      <div id="recentList" class="clip-list" data-tab="recent"></div>
-      <div id="favoritesList" class="clip-list" data-tab="favorites"></div>
+      <div id="recentList" class="clip-list" data-tab="recent">
+        <div class="empty-state">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 15V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="empty-title">Any recent clip</p>
+          <p class="empty-description">Open a new tab and copy your first text</p>
+        </div>
+      </div>
+      <div id="favoritesList" class="clip-list" data-tab="favorites">
+        <div class="empty-state">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="empty-title">Any favorite clip</p>
+          <p class="empty-description">Star your first clip to save it here</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="loading-state">
+      <div class="loading-spinner">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM12 4C16.4183 4 20 7.58172 20 12C20 16.4183 16.4183 20 12 20C7.58172 20 4 16.4183 4 12C4 7.58172 7.58172 4 12 4Z" fill="currentColor" opacity="0.2"/>
+          <path d="M2 12C2 6.47715 6.47715 2 12 2V4C7.58172 4 4 7.58172 4 12H2Z" fill="currentColor"/>
+        </svg>
+      </div>
+      <p class="loading-text">Searching clips...</p>
     </div>
 
     <!-- Settings Modal -->
@@ -66,8 +100,18 @@
         <div class="pro-features">
           <h3>Pro Features:</h3>
           <ul>
-            <li>✨ Unlimited recent clips & Favorites</li>
-            <li>🔍 AI-powered semantic search</li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3L14.0357 8.16153L19.5 8.5L15.75 12.3461L16.7143 17.5L12 15L7.28571 17.5L8.25 12.3461L4.5 8.5L9.96429 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Unlimited recent clips & Favorites
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              AI-powered semantic search
+            </li>
           </ul>
           <div class="upgrade-button-container">
             <button id="upgradeBtn" class="primary-btn">Try now 3 months free</button>
@@ -76,26 +120,47 @@
         </div>
       </div>
     </div>
+
+    <!-- Pro Status Modal -->
+    <div id="proStatusModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3L14.0357 8.16153L19.5 8.5L15.75 12.3461L16.7143 17.5L12 15L7.28571 17.5L8.25 12.3461L4.5 8.5L9.96429 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Pro Features
+          </h2>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="pro-features">
+          <p>You are enjoying Pro features for 3 months free:</p>
+          <ul>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3L14.0357 8.16153L19.5 8.5L15.75 12.3461L16.7143 17.5L12 15L7.28571 17.5L8.25 12.3461L4.5 8.5L9.96429 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Unlimited recent clips
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3L14.0357 8.16153L19.5 8.5L15.75 12.3461L16.7143 17.5L12 15L7.28571 17.5L8.25 12.3461L4.5 8.5L9.96429 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Unlimited favorites
+            </li>
+            <li>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              AI-powered semantic search
+            </li>
+          </ul>
+          <p class="price-caption">After trial: $10/year</p>
+        </div>
+      </div>
+    </div>
   </div>
 
-<!-- Pro Status Modal -->
-<div id="proStatusModal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>⭐ Pro Features</h2>
-      <button class="close-btn">&times;</button>
-    </div>
-    <div class="pro-features">
-      <p>You are enjoying Pro features for 3 months free:</p>
-      <ul>
-        <li>✨ Unlimited recent clips</li>
-        <li>💫 Unlimited favorites</li>
-        <li>🔍 AI-powered semantic search</li>
-      </ul>
-      <p class="price-caption">After trial: $10/year</p>
-    </div>
-  </div>
-</div>
   <script src="popup.js"></script>
 </body>
 </html>

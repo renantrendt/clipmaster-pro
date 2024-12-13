@@ -1,13 +1,13 @@
 :root {
-  --primary-color: #333;
-  --secondary-color: #333;
+  --primary-color: #000;
+  --secondary-color: #666;
   --text-color: #333;
   --bg-color: #fff;
   --hover-color: #f5f5f5;
   --min-width: 300px;
   --min-height: 400px;
-  --border-color: #ddd;
-  --accent-color: #1a73e8;
+  --border-color: #e5e7eb;
+  --accent-color: #0070f3;
 }
 
 html {
@@ -63,16 +63,41 @@ h1 {
 
 .search-container {
   flex: 1;
-  margin-right: 16px;
+  margin-right: 4px;
+  max-width: 110px;
 }
 
 #searchInput {
   width: 100%;
-  padding: 8px;
+  padding: 6px 24px 6px 8px;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
+  border-radius: 8px;
+  font-size: 13px;
+  background-color: #fafafa;
+  color: #000;
+  transition: all 0.2s ease;
+}
+
+#searchInput::placeholder {
+  color: #71717a;
+}
+
+#searchInput:focus {
+  outline: none;
+  border-color: #000;
+  background-color: white;
+}
+
+#searchInput:not(:placeholder-shown) {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23666666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>');
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+  cursor: text;
+}
+
+#searchInput:not(:placeholder-shown):hover {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="%23333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>');
 }
 
 #searchInput:hover {
@@ -85,7 +110,7 @@ h1 {
 
 .header-buttons {
   display: flex;
-  gap: 8px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
@@ -93,19 +118,15 @@ h1 {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 8px;
-  font-size: 16px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  padding: 4px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .header-buttons button:hover {
-  background-color: var(--hover-color);
-}
-
-.header-buttons button.active {
-  background-color: var(--hover-color);
-  color: var(--primary-color);
+  color: #333;
 }
 
 #pinBtn {
@@ -126,8 +147,10 @@ h1 {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #f4b400;
+  color: #666;
   font-weight: 500;
+  font-size: 12px !important;
+  padding: 2px 4px !important;
 }
 
 .pro-hint {
@@ -145,53 +168,53 @@ h1 {
 
 .tabs {
   display: flex;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-color);
   margin-bottom: 16px;
   position: relative;
-  flex-shrink: 0;
+  gap: 24px;
+  padding: 0 4px;
 }
 
 .tab-btn {
-  flex: 1;
-  padding: 12px 24px;
   border: none;
   background: none;
-  cursor: pointer;
-  color: #666;
+  padding: 8px 0;
   font-size: 14px;
+  font-weight: 500;
+  color: var(--secondary-color);
+  cursor: pointer;
   position: relative;
-  transition: color 0.3s ease;
+  transition: color 0.2s ease;
 }
 
 .tab-btn:hover {
-  color: #1a73e8;
+  color: var(--primary-color);
 }
 
 .tab-btn.active {
-  color: #1a73e8;
+  color: var(--primary-color);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--primary-color);
+  border-radius: 2px;
 }
 
 .tab-indicator {
-  position: absolute;
-  bottom: -1px;
-  height: 2px;
-  width: 50%;
-  background-color: #1a73e8;
-  transition: transform 0.3s ease;
-}
-
-[data-tab="recent"].active ~ .tab-indicator {
-  transform: translateX(0);
-}
-
-[data-tab="favorites"].active ~ .tab-indicator {
-  transform: translateX(100%);
+  display: none;
 }
 
 .tab-content {
   flex: 1;
   overflow-y: auto;
   min-height: 0; /* Important for Firefox */
+  position: relative;
 }
 
 .clip-list {
@@ -212,39 +235,32 @@ h1 {
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   transition: all 0.2s;
   background-color: var(--bg-color);
 }
 
-.clip-item:hover {
-  background-color: var(--hover-color);
-}
-
-.clip-item.clicked {
-  background-color: var(--hover-color);
-  transform: scale(0.98);
-}
-
 .clip-text {
+  margin: 0;
   flex: 1;
-  margin-right: 8px;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 14px;
+  white-space: nowrap;
+  padding-right: 8px;
 }
 
 .clip-actions {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+  align-items: center;
 }
 
 .favorite-btn {
-  background: none;
   border: none;
-  cursor: pointer;
+  background: none;
   padding: 4px;
+  cursor: pointer;
   font-size: 16px;
   opacity: 0.5;
   transition: opacity 0.2s;
@@ -257,6 +273,10 @@ h1 {
 .favorite-btn.active {
   opacity: 1;
   color: #f4b400;
+}
+
+.copy-btn {
+  display: none;
 }
 
 .settings {
@@ -279,35 +299,124 @@ h1 {
 }
 
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
   text-align: center;
-  padding: 20px;
-  color: #666;
-  font-style: italic;
+  color: var(--secondary-color);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.empty-message {
-  text-align: center;
-  padding: 20px;
-  color: #666;
+.empty-state svg {
+  margin-bottom: 16px;
+  color: #71717a;
+  width: 24px;
+  height: 24px;
+}
+
+.empty-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--primary-color);
+  margin: 0 0 4px 0;
+}
+
+.empty-description {
+  font-size: 13px;
+  color: var(--secondary-color);
+  margin: 0;
+  opacity: 0.8;
+}
+
+.clip-list:empty::after {
+  display: none;
+}
+
+.ai-search-btn, #settingsBtn, #pinBtn {
+  padding: 4px;
 }
 
 .ai-search-btn {
   background-color: #6366f1;
-  color: white;
+  color: #666;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.2s;
-  padding: 4px 8px;
 }
 
 .ai-search-btn:hover {
   background-color: #4f46e5;
+  color: #333;
 }
 
 .ai-search-btn:disabled {
   background-color: #9ca3af;
   cursor: not-allowed;
+}
+
+.ai-search-btn svg,
+#settingsBtn svg,
+#pinBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ai-search-btn .loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.ai-search-btn:disabled .loading-spinner {
+  opacity: 0.5;
+}
+
+.loading-state {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--secondary-color);
+}
+
+.loading-state.active {
+  display: flex;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 16px;
+  color: var(--primary-color);
+  animation: spin 1s linear infinite;
+}
+
+.loading-spinner svg {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  font-size: 14px;
+  color: var(--secondary-color);
+  margin: 0;
 }
 
 /* Modal Styles */
@@ -413,6 +522,23 @@ h1 {
   list-style: none;
   padding: 0;
   margin: 20px 0;
+}
+
+.pro-features li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pro-features h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pro-features svg {
+  flex-shrink: 0;
 }
 
 .pro-features li {
