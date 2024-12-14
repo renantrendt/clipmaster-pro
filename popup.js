@@ -47,8 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initializePopup() {
   try {
-    // Load clips and update UI
-    await updateUI();
+    await switchTab('recent');
     
     // Check if window is already pinned
     const { pinnedWindow } = await chrome.storage.local.get('pinnedWindow');
