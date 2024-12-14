@@ -1,3 +1,40 @@
+const sharp = require('sharp');
+
+async function generateIcon() {
+    try {
+        // Criar um SVG com nosso ícone
+        const svgIcon = `
+        <svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+            <!-- Círculo de fundo com gradiente -->
+            <defs>
+                <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#64B5F6;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#2196F3;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+            
+            <!-- Círculo principal -->
+            <circle cx="64" cy="64" r="60" fill="url(#grad)" />
+            
+            <!-- Clipboard -->
+            <rect x="44" y="34" width="40" height="60" fill="white" rx="4" />
+            <rect x="54" y="29" width="20" height="10" fill="white" rx="2" />
+            
+            <!-- Linhas de texto -->
+            <rect x="52" y="49" width="24" height="3" fill="#E3F2FD" rx="1.5" />
+            <rect x="52" y="64" width="24" height="3" fill="#E3F2FD" rx="1.5" />
+            <rect x="52" y="79" width="24" height="3" fill="#E3F2FD" rx="1.5" />
+        </svg>`;
+
+        // Gerar os diferentes tamanhos
+        const sizes = [16, 48, 128];
+        
+        for (const size of sizes) {
+            await sharp(Buffer.from(svgIcon))
+                .resize(size, size)
+                .png()
+                .toFile(`icons/icon${size}.png`);
+        }
 const Jimp = require('jimp');
 
 async function generateIcon() {

@@ -1,56 +1,66 @@
 # ClipMaster Pro
 
-Never lose a clipboard again! This app saves all your clips and when you click on a clip, it automatically copies and pastes.
+<div align="center">
+  <img src="icons/icon128.png" alt="ClipMaster Pro Logo" width="128" height="128">
+  <h3>Advanced Clipboard Manager for Chrome</h3>
+  <p>Boost your productivity with smart clipboard management and AI-powered features</p>
+</div>
 
-You can also use AI-powered semantic search to find related clips.
+## ✨ Features
 
-## Demo
+### 📋 Smart Clipboard History
+- Store up to 1000 recent clips (Pro)
+- Quick access to your clipboard history
+- Organize and manage your clips efficiently
 
-🎥 [Watch Demo Video](https://www.loom.com/share/bd1e0b05ccef467682219f3b02fbe2dd)
+### 🔍 Semantic Search
+- Find clips using natural language
+- AI-powered context understanding
+- Quick filtering and sorting options
 
-## Features
+### 📌 Floating Window
+- Pin the clipboard window
+- Access your clips while working
+- Customizable position and size
 
-### Free Version
-- After selecting a clip, the text automatically copies and pastes
-- ✂️ Recent clips history
-- ⭐ Favorites list
-- 📌 Window pinning option
+### ⭐ Favorites System
+- Save important clips indefinitely
+- Unlimited favorites with Pro version
+- Quick access to frequent content
 
-### Pro Version
-- ✨ Unlimited clips history
-- ⭐ Unlimited favorites
-- 🔍 AI-powered semantic search
+### 🔒 Privacy & Security
+- Local storage for your data
+- End-to-end encryption
+- No data collection
 
-## Installation
+## 💎 Pro Features
 
-1. Clone the repository:
-```bash
-git clone https://github.com/renantrendt/clipmaster-pro.git
-```
+Upgrade to Pro and unlock:
+- 1000 recent clips (vs 50 in free)
+- Unlimited favorites
+- Semantic search capability
+- Floating window feature
+- Priority support
 
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode"
-4. Click on "Load unpacked" and select the project folder
+## 📄 Documentation
 
-## Development
+- [Privacy Policy](https://github.com/renantrendt/clipmaster-pro/blob/main/PRIVACY_POLICY.md)
+- [Terms of Service](https://github.com/renantrendt/clipmaster-pro/blob/main/TERMS_OF_SERVICE.md)
+- [AI Usage Documentation](https://github.com/renantrendt/clipmaster-pro/blob/main/AI_USAGE.md)
 
-### Prerequisites
-- Node.js
-- npm
+## 🚀 Installation
 
-### Environment Setup
-1. Install dependencies:
-```bash
-npm install
-```
+1. Visit the [Chrome Web Store](https://chrome.google.com/webstore/detail/clipmaster-pro)
+2. Click "Add to Chrome"
+3. Start copying and managing your clips!
 
-2. For the development server (optional, only for Pro features):
-```bash
-cd server
-npm install
-npm run dev
-```
+## 📫 Support
 
-## License
+Having issues or questions? Contact us:
+- Email: renan@renanserrano.com.br
+- [Report a bug](https://github.com/renantrendt/clipmaster-pro/issues)
+- [Feature request](https://github.com/renantrendt/clipmaster-pro/issues/new)
 
-This project is licensed under the ISC License - see the LICENSE file for details.
+## 📝 License
+
+ClipMaster Pro  2024 by Renan Serrano. All rights reserved.

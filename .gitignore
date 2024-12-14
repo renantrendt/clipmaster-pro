@@ -1,26 +1,40 @@
 # Dependencies
 node_modules/
+package-lock.json
 
-# Environment variables
+# Environment files
 .env
 .env.local
 .env.*.local
 
-# Build files
-dist/
-build/
-
 # IDE files
-.vscode/
 .idea/
-*.sublime-*
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+.vscode/
+*.sublime-project
+*.sublime-workspace
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+
+# Build files
+dist/
+build/
+*.zip
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache

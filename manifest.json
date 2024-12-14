@@ -2,7 +2,9 @@
   "manifest_version": 3,
   "name": "ClipMaster Pro",
   "version": "1.0",
-  "description": "Advanced clipboard manager with premium features",
+  "description": "Advanced clipboard manager with premium features including semantic search, unlimited storage, and floating window",
+  "author": "renan@renanserrano.com.br",
+  "homepage_url": "https://github.com/renantrendt/clipmaster-pro",
   "permissions": [
     "storage",
     "clipboardRead",
@@ -24,16 +26,19 @@
     "type": "module"
   },
   "host_permissions": [
-    "http://localhost:3000/*",
     "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_icon": "icons/icon.svg"
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "icons": {
-    "16": "icons/icon.svg",
-    "48": "icons/icon.svg",
-    "128": "icons/icon.svg"
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
 }
