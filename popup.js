@@ -47,56 +47,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initializePopup() {
   try {
-    // Primeiro, configurar os event listeners
-    // setupEventListeners();
+    // Load clips and update UI
+    await updateUI();
     
-    // Depois, carregar os dados
-    const data = await chrome.storage.local.get(['recentClips', 'favoriteClips', 'isPinned', 'pinnedWindowId']);
-    console.log('Loaded data:', data);
-    
-    // Verificar se existe uma janela pinada
-    if (data.isPinned) {
-      const windows = await chrome.windows.getAll();
-      const pinnedWindowExists = windows.some(window => window.id === data.pinnedWindowId);
-      
-      // Se não existir, resetar o estado
-      if (!pinnedWindowExists) {
-        console.log('Pinned window not found, resetting state');
-        isPinned = false;
-        pinnedWindowId = null;
-        chrome.storage.local.set({ isPinned: false, pinnedWindowId: null });
-      } else {
-        isPinned = true;
-        pinnedWindowId = data.pinnedWindowId;
-      }
-    } else {
-      isPinned = false;
-      pinnedWindowId = null;
+    // Check if window is already pinned
+    const { pinnedWindow } = await chrome.storage.local.get('pinnedWindow');
+    if (pinnedWindow) {
+      const pinButton = document.getElementById('pinBtn');
+      pinButton.classList.add('active');
+      startPolling();
     }
-    
-    // Atualizar a UI
-    updatePinButton();
-    
-    // Ativar a tab Recent
-    const recentTab = document.querySelector('[data-tab="recent"]');
-    const recentList = document.querySelector('.clip-list[data-tab="recent"]');
-    
-    if (recentTab && recentList) {
-      recentTab.classList.add('active');
-      recentList.classList.add('active');
-    }
-    
-    // Carregar os clips
-    await loadClips();
-    
-    // Carregar outras configurações
-    await loadSettings();
-    checkProStatus();
-    
-    // Verificar janela pinada
-    await checkPinnedWindow();
   } catch (error) {
-    console.error('Error in popup initialization:', error);
+    console.error('Error initializing popup:', error);
   }
 }
 
@@ -105,13 +67,7 @@ chrome.runtime.onMessage.addListener((message) => {
   console.log('Message received in popup:', message);
   
   if (message.action === 'updateClips') {
-    if (message.clips) {
-      // Se recebemos os clips diretamente, usamos eles
-      updateRecentList(message.clips, []);
-    } else {
-      // Caso contrário, recarregamos do storage
-      loadClips();
-    }
+    updateUI();
   }
 });
 
@@ -151,7 +107,28 @@ function setupEventListeners() {
       }
     });
   });
-  
+
+  // Search input
+  const searchInput = document.getElementById('searchInput');
+  const debouncedSearch = debounce(() => performSearch(false), 300);
+  searchInput.addEventListener('input', debouncedSearch);
+
+  // AI Search button
+  const aiSearchBtn = document.getElementById('aiSearchBtn');
+  aiSearchBtn.addEventListener('click', async () => {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) return;
+    
+    try {
+      aiSearchBtn.disabled = true;
+      aiSearchBtn.classList.add('loading');
+      await performSearch(true);
+    } finally {
+      aiSearchBtn.disabled = false;
+      aiSearchBtn.classList.remove('loading');
+    }
+  });
+
   // Settings Modal
   const settingsBtn = document.getElementById('settingsBtn');
   if (settingsBtn) {
@@ -184,12 +161,6 @@ function setupEventListeners() {
     }
   });
   
-  // Search input
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.addEventListener('input', debounce(() => performSearch(false), 300));
-  }
-  
   // Pin Button
   const pinBtn = document.getElementById('pinBtn');
   if (pinBtn) {
@@ -213,19 +184,6 @@ function setupEventListeners() {
   if (importBtn) {
     importBtn.addEventListener('click', importFavorites);
   }
-  
-  const aiSearchBtn = document.getElementById('aiSearchBtn');
-  aiSearchBtn.addEventListener('click', async () => {
-    const { isPro } = await chrome.storage.local.get(['isPro']);
-    if (!isPro) {
-      toggleModal('proModal', true);
-      return;
-    }
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput && searchInput.value) {
-      performSearch(true);
-    }
-  });
 }
 
 // Alternar entre abas
@@ -556,54 +514,76 @@ async function performSearch(isSemanticSearch = false) {
   const searchInput = document.getElementById('searchInput');
   const query = searchInput.value.trim().toLowerCase();
   
-  // If search is empty, show all clips
   if (!query) {
-    const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [] } = 
-      await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    
-    if (currentTab === 'recent') {
-      updateRecentList(savedRecent, favoriteClips);
-    } else {
-      updateList('favoritesList', savedFavorites, favoriteClips);
-    }
+    updateUI();
     return;
   }
 
   try {
-    let searchResults = [];
-    const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [] } = 
-      await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    
-    // Determine which clips to search based on current tab
-    const clipsToSearch = currentTab === 'recent' ? savedRecent : savedFavorites;
-    
+    const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    let results;
+
     if (isSemanticSearch) {
-      searchResults = await performSemanticSearch(query, clipsToSearch);
-      if (searchResults.length === 0) {
-        showEmptyState(true);
-        return;
-      }
+      results = await performSemanticSearch(query);
     } else {
-      searchResults = clipsToSearch.filter(clip => 
+      // Busca normal por texto
+      const allClips = [...recentClips, ...favoriteClips];
+      results = allClips.filter(clip => 
         clip.text.toLowerCase().includes(query)
       );
-      
-      if (searchResults.length === 0) {
-        showEmptyState(false);
-        return;
-      }
     }
-    
-    // Update the appropriate list based on current tab
+
+    // Atualizar a UI com os resultados
     if (currentTab === 'recent') {
-      updateRecentList(searchResults, favoriteClips);
+      updateList('recentList', results, favoriteClips);
     } else {
-      updateList('favoritesList', searchResults, favoriteClips);
+      const favoriteResults = results.filter(clip => 
+        favoriteClips.some(f => f.text === clip.text)
+      );
+      updateList('favoritesList', favoriteResults, favoriteClips);
     }
-    
+
+    // Mostrar estado vazio se não houver resultados
+    if (results.length === 0) {
+      showEmptyState(isSemanticSearch);
+    }
   } catch (error) {
     console.error('Search error:', error);
     showEmptyState(isSemanticSearch);
+  }
+}
+
+// Perform semantic search
+async function performSemanticSearch(query) {
+  try {
+    // Enviar mensagem para o background script
+    const response = await chrome.runtime.sendMessage({
+      action: 'semanticSearch',
+      query: query
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Semantic search failed');
+    }
+
+    // Log para debug
+    console.log('Semantic search response:', response);
+
+    // Se não houver resultados, retornar array vazio
+    if (!response.results || !Array.isArray(response.results)) {
+      console.warn('No results or invalid results format:', response);
+      return [];
+    }
+
+    // Mapear os resultados para o formato esperado
+    return response.results.map(result => ({
+      id: Date.now() + Math.random(),
+      text: typeof result === 'string' ? result : result.text,
+      timestamp: new Date().toISOString()
+    }));
+  } catch (error) {
+    console.error('Semantic search error:', error);
+    throw error;
   }
 }
 
@@ -996,6 +976,25 @@ function setupProHints() {
     closeBtn.addEventListener('click', () => {
       proModal.style.display = 'none';
     });
+  }
+}
+
+// UI update function
+async function updateUI() {
+  try {
+    const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    
+    if (currentTab === 'recent') {
+      updateList('recentList', recentClips, favoriteClips);
+    } else {
+      updateList('favoritesList', favoriteClips, favoriteClips);
+    }
+    
+    updateSearchState();
+    updateProButton();
+    updatePinButton();
+  } catch (error) {
+    console.error('Error updating UI:', error);
   }
 }
 

@@ -157,9 +157,20 @@ serve(async (req) => {
         }
       }
 
+      // Verificar se temos os índices relevantes
+      if (!parsedContent.relevant_indices || !Array.isArray(parsedContent.relevant_indices)) {
+        throw new Error('Resposta inválida do Claude: relevant_indices não encontrado ou inválido');
+      }
+
+      // Mapear os índices para os textos correspondentes
+      const results = parsedContent.relevant_indices
+        .map(index => clips[index - 1])
+        .filter(text => text); // Remove undefined/null values
+
       return new Response(
         JSON.stringify({ 
-          results: parsedContent.relevant_indices.map(index => clips[index - 1])
+          success: true,
+          results: results
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
