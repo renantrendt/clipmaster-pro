@@ -112,6 +112,31 @@ function setupEventListeners() {
   const searchInput = document.getElementById('searchInput');
   const debouncedSearch = debounce(() => performSearch(false), 300);
   searchInput.addEventListener('input', debouncedSearch);
+  
+  // Handle cursor style for the X button
+  searchInput.addEventListener('mousemove', (e) => {
+    const rect = searchInput.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x > rect.width - 24 && searchInput.value) {
+      searchInput.style.cursor = 'pointer';
+    } else {
+      searchInput.style.cursor = 'text';
+    }
+  });
+  
+  searchInput.addEventListener('mouseleave', () => {
+    searchInput.style.cursor = 'text';
+  });
+
+  // Handle click on the X button
+  searchInput.addEventListener('click', (e) => {
+    const rect = searchInput.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x > rect.width - 24 && searchInput.value) {
+      searchInput.value = '';
+      updateUI();
+    }
+  });
 
   // AI Search button
   const aiSearchBtn = document.getElementById('aiSearchBtn');
@@ -830,7 +855,7 @@ async function updateProButton() {
   const { isPro } = await chrome.storage.local.get(['isPro']);
   const proBtn = document.getElementById('proBtn');
   if (proBtn) {
-    proBtn.style.color = isPro ? '#f4b400' : '#9ca3af';
+    proBtn.classList.toggle('is-pro', isPro);
   }
 }
 
