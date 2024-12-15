@@ -777,79 +777,33 @@ function updateSearchState() {
   searchInput.title = isPro ? 'Buscar em seus clips' : 'Disponível apenas na versão Pro';
 }
 
-function showEmptyState(isSemanticSearch) {
+function showEmptyState(isSemanticSearch = false) {
   const list = document.querySelector(`.clip-list[data-tab="${currentTab}"]`);
   if (!list) return;
 
-  const title = isSemanticSearch ? 'No similar clips found' : 'No clips found';
-  const description = isSemanticSearch 
-    ? 'Try a different search term or check your recent clips'
-    : 'Try a different search term';
+  const isRecent = currentTab === 'recent';
+  const title = isSemanticSearch ? 'No similar clips found' : 
+                isRecent ? 'Any recent clip' : 'Any favorite clip';
+  const description = isSemanticSearch ? 'Try a different search term' :
+                     isRecent ? 'Open a new tab and copy your first text' :
+                     'Star your first clip to save it here';
 
   list.innerHTML = `
     <div class="empty-state">
-      <div class="empty-state-title">${title}</div>
-      <div class="empty-state-description">${description}</div>
-      ${isSemanticSearch ? '' : '<div class="empty-state-suggestion">Click on the 🔍 button to use AI search</div>'}
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        ${isRecent ? `
+          <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 15V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        ` : `
+          <path d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        `}
+      </svg>
+      <p class="empty-state-title">${title}</p>
+      <p class="empty-state-description">${description}</p>
+      ${isSemanticSearch || !isRecent ? '' : '<p class="empty-state-suggestion">Click on the 🔍 button to use AI search</p>'}
     </div>
   `;
-}
-
-// Import/Export
-function exportFavorites() {
-  const data = JSON.stringify(favoriteClips);
-  const blob = new Blob([data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'clipmaster-favorites.json';
-  a.click();
-  
-  URL.revokeObjectURL(url);
-}
-
-function importFavorites() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json';
-  
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    
-    reader.onload = async (event) => {
-      try {
-        const imported = JSON.parse(event.target.result);
-        favoriteClips = imported;
-        await saveClips();
-        updateUI();
-      } catch (err) {
-        alert('Erro ao importar favoritos. Verifique se o arquivo é válido.');
-      }
-    };
-    
-    reader.readAsText(file);
-  };
-  
-  input.click();
-}
-
-// Settings
-function showSettings() {
-  const modal = document.getElementById('settingsModal');
-  modal.style.display = 'block';
-  
-  const recentLimit = document.getElementById('recentLimit');
-  const favoritesLimit = document.getElementById('favoritesLimit');
-  
-  recentLimit.value = isPro ? PRO_LIMIT : DEFAULT_RECENT_LIMIT;
-  favoritesLimit.value = isPro ? PRO_LIMIT : DEFAULT_FAVORITES_LIMIT;
-  
-  if (!isPro) {
-    recentLimit.max = DEFAULT_RECENT_LIMIT;
-    favoritesLimit.max = DEFAULT_FAVORITES_LIMIT;
-  }
 }
 
 // Stripe Integration
