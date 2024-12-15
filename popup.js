@@ -329,7 +329,7 @@ function createClipElement(clip, isFavorite = false) {
   
   const favoriteButton = document.createElement('button');
   favoriteButton.className = 'action-btn favorite-btn' + (isFavorite ? ' active' : '');
-  favoriteButton.innerHTML = isFavorite ? '⭐' : '☆';
+  favoriteButton.innerHTML = `<svg width="10" height="14" viewBox="0 0 14 18" stroke="currentColor" fill="${isFavorite ? 'currentColor' : 'none'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l-6-4-6 4V3a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"></path></svg>`;
   favoriteButton.title = isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
   
   // Prevent click event from bubbling up when clicking the favorite button
