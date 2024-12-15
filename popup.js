@@ -16,6 +16,8 @@ let isPro = false;
 let isPinned = false;
 let recentClips = [];
 let favoriteClips = [];
+let isSemanticSearchActive = false;
+let lastSearchResults = null;
 const DEFAULT_RECENT_LIMIT = 50;
 const DEFAULT_FAVORITES_LIMIT = 10;
 const PRO_LIMIT = 1000;
@@ -233,8 +235,25 @@ async function switchTab(tab) {
     // Check if there's an active search
     const searchInput = document.getElementById('searchInput');
     if (searchInput && searchInput.value.trim()) {
-      // If there's a search query, perform the search in the new tab
-      performSearch(false);
+      // If there's a search query and we have results, use them
+      if (lastSearchResults) {
+        if (currentTab === 'recent') {
+          updateList('recentList', lastSearchResults, favoriteClips);
+        } else {
+          const favoriteResults = lastSearchResults.filter(clip => 
+            favoriteClips.some(f => f.text === clip.text)
+          );
+          updateList('favoritesList', favoriteResults, favoriteClips);
+        }
+        
+        // Show empty state if needed
+        if (lastSearchResults.length === 0) {
+          showEmptyState(isSemanticSearchActive);
+        }
+      } else {
+        // If no cached results, perform the search again
+        performSearch(isSemanticSearchActive);
+      }
     } else {
       // If no search, load all clips
       const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
@@ -539,25 +558,45 @@ async function performSearch(isSemanticSearch = false) {
   const query = searchInput.value.trim().toLowerCase();
   
   if (!query) {
+    isSemanticSearchActive = false;
+    lastSearchResults = null;
     updateUI();
     return;
   }
 
   try {
-    const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    const { recentClips = [], favoriteClips = [], isPro = false } = 
+      await chrome.storage.local.get(['recentClips', 'favoriteClips', 'isPro']);
     let results;
 
     if (isSemanticSearch) {
+      if (!isPro) {
+        const proModal = document.getElementById('proModal');
+        if (proModal) {
+          proModal.style.display = 'block';
+        }
+        return;
+      }
+      
       results = await performSemanticSearch(query);
+      isSemanticSearchActive = true;
     } else {
-      // Busca normal por texto
-      const allClips = [...recentClips, ...favoriteClips];
-      results = allClips.filter(clip => 
+      // Ensure all clips have text property and are unique
+      const uniqueClips = new Map();
+      [...recentClips, ...favoriteClips].forEach(clip => {
+        if (clip && typeof clip.text === 'string' && !uniqueClips.has(clip.text)) {
+          uniqueClips.set(clip.text, clip);
+        }
+      });
+      
+      results = Array.from(uniqueClips.values()).filter(clip => 
         clip.text.toLowerCase().includes(query)
       );
+      isSemanticSearchActive = false;
     }
 
-    // Atualizar a UI com os resultados
+    lastSearchResults = results;
+
     if (currentTab === 'recent') {
       updateList('recentList', results, favoriteClips);
     } else {
@@ -567,20 +606,18 @@ async function performSearch(isSemanticSearch = false) {
       updateList('favoritesList', favoriteResults, favoriteClips);
     }
 
-    // Mostrar estado vazio se não houver resultados
     if (results.length === 0) {
-      showEmptyState(isSemanticSearch);
+      showEmptyState(isSemanticSearchActive);
     }
   } catch (error) {
     console.error('Search error:', error);
-    showEmptyState(isSemanticSearch);
+    showEmptyState(isSemanticSearchActive);
   }
 }
 
 // Perform semantic search
 async function performSemanticSearch(query) {
   try {
-    // Enviar mensagem para o background script
     const response = await chrome.runtime.sendMessage({
       action: 'semanticSearch',
       query: query
@@ -590,21 +627,35 @@ async function performSemanticSearch(query) {
       throw new Error(response?.error || 'Semantic search failed');
     }
 
-    // Log para debug
     console.log('Semantic search response:', response);
 
-    // Se não houver resultados, retornar array vazio
     if (!response.results || !Array.isArray(response.results)) {
       console.warn('No results or invalid results format:', response);
       return [];
     }
 
-    // Mapear os resultados para o formato esperado
-    return response.results.map(result => ({
-      id: Date.now() + Math.random(),
-      text: typeof result === 'string' ? result : result.text,
-      timestamp: new Date().toISOString()
-    }));
+    // Get existing clips for comparison
+    const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    const existingClips = [...recentClips, ...favoriteClips];
+
+    // Normalize and deduplicate results
+    const uniqueResults = new Set(response.results.map(result => 
+      typeof result === 'string' ? result : result.text
+    ));
+
+    return Array.from(uniqueResults).map(text => {
+      // Check if this text already exists in any clip
+      const existingClip = existingClips.find(clip => clip.text === text);
+      if (existingClip) {
+        return existingClip;
+      }
+
+      // Create new clip with consistent structure
+      return {
+        text: text,
+        timestamp: new Date().toISOString()
+      };
+    });
   } catch (error) {
     console.error('Semantic search error:', error);
     throw error;
@@ -648,7 +699,7 @@ async function addClip(text) {
 
 async function toggleFavorite(clip) {
   try {
-    const { isPro, maxFavorites = 5 } = await chrome.storage.local.get(['isPro', 'maxFavorites']);
+    const { isPro, maxFavorites = 5, recentClips: savedRecent = [] } = await chrome.storage.local.get(['isPro', 'maxFavorites', 'recentClips']);
     const isFavorite = favoriteClips.some(f => f.text === clip.text);
     
     if (!isFavorite) {
@@ -671,9 +722,22 @@ async function toggleFavorite(clip) {
     
     await saveClips();
     
-    // Update both lists to reflect changes
-    updateRecentList(recentClips, favoriteClips);
-    updateList('favoritesList', favoriteClips, favoriteClips);
+    // Update local recentClips with saved data
+    recentClips = savedRecent;
+    
+    // Check if we're in a search
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.value.trim()) {
+      // Re-run the search to update the filtered results
+      performSearch(isSemanticSearchActive);
+    } else {
+      // Update both lists to reflect changes
+      if (currentTab === 'recent') {
+        updateRecentList(recentClips, favoriteClips);
+      } else {
+        updateList('favoritesList', favoriteClips, favoriteClips);
+      }
+    }
   } catch (error) {
     console.error('Error toggling favorite:', error);
   }

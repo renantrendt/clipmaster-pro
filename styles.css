@@ -455,10 +455,32 @@ h1 {
   font-weight: bold;
   cursor: pointer;
   color: #666;
+  background: none;
+  border: none;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
 }
 
 .close-btn:hover {
   color: #000;
+}
+
+.modal h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.modal h2 svg {
+  flex-shrink: 0;
 }
 
 .settings-body {
