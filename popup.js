@@ -404,7 +404,8 @@ function incrementMaxClips(delta) {
 
 // Carregar configurações
 async function loadSettings() {
-  const settings = await chrome.storage.local.get(['windowSize', 'maxClips']);
+  const settings = await chrome.storage.local.get(['windowSize', 'maxClips', 'maxFavorites']);
+  
   if (settings.windowSize) {
     document.documentElement.style.width = settings.windowSize.width + 'px';
     document.documentElement.style.height = settings.windowSize.height + 'px';
@@ -412,7 +413,15 @@ async function loadSettings() {
   
   // Set max clips value
   const maxClips = document.getElementById('maxClips');
-  maxClips.value = settings.maxClips || 50;
+  const maxFavorites = document.getElementById('maxFavorites');
+  
+  if (maxClips) {
+    maxClips.value = settings.maxClips || DEFAULT_RECENT_LIMIT;
+  }
+  
+  if (maxFavorites) {
+    maxFavorites.value = settings.maxFavorites || DEFAULT_FAVORITES_LIMIT;
+  }
 }
 
 // Toggle Pin
@@ -915,10 +924,14 @@ function showProUpgradeModal() {
 }
 
 async function updateProButton() {
-  const { isPro } = await chrome.storage.local.get(['isPro']);
+  const data = await chrome.storage.local.get(['isPro']);
+  const isPro = data.isPro || false;
+  
   const proBtn = document.getElementById('proBtn');
   if (proBtn) {
-    proBtn.classList.toggle('is-pro', isPro);
+    proBtn.textContent = isPro ? 'Pro' : 'Free';
+    proBtn.title = isPro ? 'Pro Version' : 'Upgrade para Pro';
+    proBtn.className = isPro ? 'pro-btn is-pro' : 'pro-btn';
   }
 }
 
@@ -951,7 +964,7 @@ function setupSettingsModal() {
 
   if (settingsBtn) {
     settingsBtn.addEventListener('click', async () => {
-      const data = await chrome.storage.local.get(['isPro']);
+      const data = await chrome.storage.local.get(['isPro', 'maxClips', 'maxFavorites']);
       const isPro = data.isPro || false;
       
       // Atualizar limites baseado no status Pro
@@ -960,18 +973,35 @@ function setupSettingsModal() {
       
       if (isPro) {
         if (maxClipsInput) {
-          maxClipsInput.max = PRO_LIMIT;
+          maxClipsInput.removeAttribute('max');
           maxClipsInput.removeAttribute('disabled');
+          // Se o valor atual for o padrão ou menor que o limite não-Pro, define 1000
+          if (!data.maxClips || data.maxClips <= 50) {
+            maxClipsInput.value = '1000';
+          }
         }
         if (maxFavoritesInput) {
-          maxFavoritesInput.max = PRO_LIMIT;
+          maxFavoritesInput.removeAttribute('max');
           maxFavoritesInput.removeAttribute('disabled');
+          // Se o valor atual for o padrão ou menor que o limite não-Pro, define 1000
+          if (!data.maxFavorites || data.maxFavorites <= 5) {
+            maxFavoritesInput.value = '1000';
+          }
         }
         
         // Esconder dicas Pro
         document.querySelectorAll('.pro-hint').forEach(hint => {
           hint.style.display = 'none';
         });
+      } else {
+        if (maxClipsInput) {
+          maxClipsInput.setAttribute('max', '50');
+          maxClipsInput.value = Math.min(parseInt(maxClipsInput.value) || 50, 50);
+        }
+        if (maxFavoritesInput) {
+          maxFavoritesInput.setAttribute('max', '5');
+          maxFavoritesInput.value = Math.min(parseInt(maxFavoritesInput.value) || 5, 5);
+        }
       }
       
       settingsModal.style.display = 'block';
@@ -999,8 +1029,16 @@ function setupSettingsModal() {
       
       // Atualizar a UI
       await loadClips();
+      await loadFavorites();
     });
   }
+
+  // Fechar modal ao clicar fora
+  window.addEventListener('click', (event) => {
+    if (event.target === settingsModal) {
+      settingsModal.style.display = 'none';
+    }
+  });
 }
 
 // Initialize settings
@@ -1012,7 +1050,7 @@ async function initializeSettings() {
   
   const maxClipsInput = document.getElementById('maxClips');
   if (maxClipsInput) {
-    maxClipsInput.value = data.maxClips || DEFAULT_RECENT_LIMIT;
+    maxClipsInput.value = data.maxClips || 50;
     maxClipsInput.max = maxLimit;
     if (isPro) {
       maxClipsInput.removeAttribute('disabled');
