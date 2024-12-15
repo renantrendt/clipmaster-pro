@@ -184,46 +184,40 @@ h1 {
 
 .tabs {
   display: flex;
+  justify-content: stretch;
   border-bottom: 1px solid var(--border-color);
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
   position: relative;
-  gap: 24px;
-  padding: 0 4px;
 }
 
 .tab-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
   border: none;
   background: none;
-  padding: 8px 0;
-  font-size: 14px;
-  font-weight: 500;
   color: var(--secondary-color);
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
   position: relative;
-  transition: color 0.2s ease;
-}
-
-.tab-btn:hover {
-  color: var(--primary-color);
+  transition: color 0.2s;
 }
 
 .tab-btn.active {
   color: var(--primary-color);
 }
 
-.tab-btn.active::after {
-  content: '';
+.tab-indicator {
   position: absolute;
   bottom: -1px;
-  left: 0;
-  right: 0;
   height: 2px;
+  width: 50%;
   background-color: var(--primary-color);
-  border-radius: 2px;
+  transition: transform 0.3s ease;
 }
 
-.tab-indicator {
-  display: none;
+.tab-btn[data-tab="favorites"].active ~ .tab-indicator {
+  transform: translateX(100%);
 }
 
 .tab-content {
@@ -237,6 +231,8 @@ h1 {
   display: none;
   height: 100%;
   overflow-y: auto;
+  max-height: 400px;
+  padding-right: 2px; /* Compensate for scrollbar width */
 }
 
 .clip-list.active {
@@ -352,7 +348,6 @@ h1 {
 }
 
 .ai-search-btn {
-  background-color: #6366f1;
   color: #666;
   border: none;
   border-radius: 4px;
@@ -361,7 +356,7 @@ h1 {
 }
 
 .ai-search-btn:hover {
-  background-color: #4f46e5;
+  background-color: #9ca3af;
   color: #333;
 }
 
@@ -599,6 +594,32 @@ h1 {
 
 #upgradeBtn:hover {
   opacity: 0.9;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 1.5px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: none; /* "none" é mais fino que "thin" */
+  scrollbar-color: #d1d5db transparent;
 }
 
 /* Responsive font sizes */
