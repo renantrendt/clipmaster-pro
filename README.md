@@ -50,9 +50,17 @@ Upgrade to Pro and unlock:
 
 ## 🚀 Installation
 
-1. Visit the [Chrome Web Store](https://chrome.google.com/webstore/detail/clipmaster-pro)
-2. Click "Add to Chrome"
-3. Start copying and managing your clips!
+While ClipMaster Pro is pending approval on the Chrome Web Store, you can install it manually:
+
+1. Download the [clipmaster-pro.zip](clipmaster-pro.zip) file from this repository
+2. Unzip the file to a folder on your computer
+3. Open Chrome and go to `chrome://extensions/`
+4. Enable "Developer mode" in the top right corner
+5. Click "Load unpacked" and select the unzipped folder
+
+The extension will be installed and ready to use!
+
+Note: We're working on a native Mac app version to provide even better integration with your system. Stay tuned for updates!
 
 ## 📫 Support
 
