@@ -25,7 +25,7 @@ let pinnedWindowId = null;
 
 let updateInterval;
 
-// Inicialização
+// Initialization
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Popup opened');
   try {
@@ -63,7 +63,7 @@ async function initializePopup() {
   }
 }
 
-// Listener para mensagens do background
+// Listener for messages from background
 chrome.runtime.onMessage.addListener((message) => {
   console.log('Message received in popup:', message);
   
@@ -81,7 +81,7 @@ async function updateRecentList(recentClips, favoriteClips) {
     return;
   }
   
-  // Limpar a lista
+  // Clear the list
   recentList.innerHTML = '';
   
   if (recentClips.length === 0) {
@@ -89,7 +89,7 @@ async function updateRecentList(recentClips, favoriteClips) {
     return;
   }
   
-  // Adicionar cada clip
+  // Add each clip
   recentClips.forEach(clip => {
     const isFavorite = favoriteClips.some(f => f.text === clip.text);
     const clipElement = createClipElement(clip, isFavorite);
@@ -97,7 +97,7 @@ async function updateRecentList(recentClips, favoriteClips) {
   });
 }
 
-// Configuração dos event listeners
+// Configure event listeners
 function setupEventListeners() {
   // Tab switching
   document.querySelectorAll('.tab-btn').forEach(button => {
@@ -212,7 +212,7 @@ function setupEventListeners() {
   }
 }
 
-// Alternar entre abas
+// Switch between tabs
 async function switchTab(tab) {
   if (!tab) return;
   
@@ -273,7 +273,7 @@ async function switchTab(tab) {
   }
 }
 
-// Carregar clips
+// Load clips
 async function loadClips() {
   try {
     const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
@@ -291,7 +291,7 @@ async function loadClips() {
   }
 }
 
-// Atualizar lista
+// Update list
 async function updateList(listId, clips, favoriteClips) {
   const list = document.getElementById(listId);
   if (!list) {
@@ -299,10 +299,10 @@ async function updateList(listId, clips, favoriteClips) {
     return;
   }
   
-  // Limpar a lista atual
+  // Clear the current list
   list.innerHTML = '';
   
-  // Verificar se há clips para mostrar
+  // Check if there are clips to show
   if (!clips || clips.length === 0) {
     showEmptyState(false);
     return;
@@ -310,7 +310,7 @@ async function updateList(listId, clips, favoriteClips) {
   
   console.log(`Updating ${listId} with ${clips.length} clips`);
   
-  // Criar elementos para cada clip
+  // Create elements for each clip
   clips.forEach(clip => {
     const isFavorite = favoriteClips.some(f => f.text === clip.text);
     const clipElement = createClipElement(clip, isFavorite);
@@ -318,7 +318,7 @@ async function updateList(listId, clips, favoriteClips) {
   });
 }
 
-// Criar item de clip
+// Create clip item
 function createClipElement(clip, isFavorite = false) {
   const clipElement = document.createElement('div');
   clipElement.className = 'clip-item';
@@ -330,7 +330,7 @@ function createClipElement(clip, isFavorite = false) {
   const favoriteButton = document.createElement('button');
   favoriteButton.className = 'action-btn favorite-btn' + (isFavorite ? ' active' : '');
   favoriteButton.innerHTML = `<svg width="10" height="14" viewBox="0 0 14 18" stroke="currentColor" fill="${isFavorite ? 'currentColor' : 'none'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l-6-4-6 4V3a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"></path></svg>`;
-  favoriteButton.title = isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+  favoriteButton.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
   
   // Prevent click event from bubbling up when clicking the favorite button
   favoriteButton.addEventListener('click', (e) => {
@@ -367,7 +367,7 @@ function createClipElement(clip, isFavorite = false) {
   return clipElement;
 }
 
-// Configurar controles de max clips
+// Configure max clips controls
 function setupMaxClipsControls() {
   const input = document.getElementById('maxClips');
   const decrease = document.querySelector('.decrease');
@@ -402,7 +402,7 @@ function incrementMaxClips(delta) {
   input.value = Math.max(10, Math.min(isPro ? 1000 : 50, newValue));
 }
 
-// Carregar configurações
+// Load settings
 async function loadSettings() {
   const settings = await chrome.storage.local.get(['windowSize', 'maxClips', 'maxFavorites']);
   
@@ -514,14 +514,14 @@ async function togglePin() {
   }
 }
 
-// Listener para quando uma janela é fechada
+// Listener for when a window is closed
 chrome.windows.onRemoved.addListener((windowId) => {
   if (windowId === pinnedWindowId) {
     console.log('Pinned window was closed');
-    // Resetar o estado
+    // Reset state
     isPinned = false;
     pinnedWindowId = null;
-    // Salvar o novo estado
+    // Save new state
     chrome.storage.local.set({ 
       isPinned: false,
       pinnedWindowId: null 
@@ -531,7 +531,7 @@ chrome.windows.onRemoved.addListener((windowId) => {
   }
 });
 
-// Verificar se já existe uma janela pinada ao iniciar
+// Check if there's already a pinned window on startup
 async function checkPinnedWindow() {
   try {
     if (!isPinned) return;
@@ -539,9 +539,9 @@ async function checkPinnedWindow() {
     const windows = await chrome.windows.getAll();
     const currentWindow = await chrome.windows.getCurrent();
     
-    // Se esta é uma janela popup e isPinned é true, atualizar pinnedWindowId
+    // If this is a popup window and isPinned is true, update pinnedWindowId
     if (currentWindow.type === 'popup') {
-      // Verificar se a janela pinada ainda existe
+      // Check if the pinned window still exists
       const pinnedWindowExists = windows.some(window => window.id === pinnedWindowId);
       if (!pinnedWindowExists) {
         console.log('Pinned window not found in check, resetting state');
@@ -561,7 +561,7 @@ async function checkPinnedWindow() {
   }
 }
 
-// Buscar clips
+// Search for clips
 async function performSearch(isSemanticSearch = false) {
   const searchInput = document.getElementById('searchInput');
   const query = searchInput.value.trim().toLowerCase();
@@ -671,14 +671,14 @@ async function performSemanticSearch(query) {
   }
 }
 
-// Salvar configurações
+// Save settings
 async function saveSettings() {
   const maxClips = document.getElementById('maxClips').value;
   await chrome.storage.local.set({ maxClips: parseInt(maxClips) });
   toggleModal('settingsModal', false);
 }
 
-// Gerenciamento de clips
+// Clip management
 async function addClip(text) {
   if (!text) return;
   
@@ -774,7 +774,7 @@ async function saveClips() {
 function updateSearchState() {
   const searchInput = document.getElementById('searchInput');
   searchInput.disabled = !isPro;
-  searchInput.title = isPro ? 'Buscar em seus clips' : 'Disponível apenas na versão Pro';
+  searchInput.title = isPro ? 'Search your clips' : 'Available only in Pro version';
 }
 
 function showEmptyState(isSemanticSearch = false) {
@@ -783,7 +783,7 @@ function showEmptyState(isSemanticSearch = false) {
 
   const isRecent = currentTab === 'recent';
   const title = isSemanticSearch ? 'No similar clips found' : 
-                isRecent ? 'Any recent clip' : 'Any favorite clip';
+                isRecent ? 'No recent clips' : 'No favorite clips';
   const description = isSemanticSearch ? 'Try a different search term' :
                      isRecent ? 'Open a new tab and copy your first text' :
                      'Star your first clip to save it here';
@@ -808,39 +808,39 @@ function showEmptyState(isSemanticSearch = false) {
 
 // Stripe Integration
 async function startCheckout() {
-  // Ativar features Pro localmente
+  // Activate Pro features locally
   isPro = true;
   await chrome.storage.local.set({ isPro: true });
   
-  // Atualizar limites
+  // Update limits
   const settings = {
     maxClips: PRO_LIMIT,
     maxFavorites: PRO_LIMIT
   };
   await chrome.storage.local.set(settings);
   
-  // Atualizar UI
+  // Update UI
   document.getElementById('proModal').style.display = 'none';
   await updateProButton();
   
-  // Remover hints Pro
+  // Remove Pro hints
   document.querySelectorAll('.pro-hint').forEach(hint => {
     hint.style.display = 'none';
   });
   
-  // Habilitar busca
+  // Enable search
   const searchInput = document.getElementById('searchInput');
   if (searchInput) {
     searchInput.disabled = false;
-    searchInput.title = 'Buscar em seus clips';
+    searchInput.title = 'Search your clips';
   }
   
-  // Atualizar UI
+  // Update UI
   await loadSettings();
   updateUI();
 }
 
-// Verificar status Pro
+// Check Pro status
 async function checkProStatus() {
   const data = await chrome.storage.local.get(['isPro']);
   isPro = data.isPro || false;
@@ -854,7 +854,7 @@ async function checkProStatus() {
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
       searchInput.disabled = false;
-      searchInput.title = 'Buscar em seus clips';
+      searchInput.title = 'Search your clips';
     }
   }
   
@@ -867,7 +867,7 @@ function showProUpgradeModal() {
   if (proModal) {
     proModal.style.display = 'block';
     
-    // Configurar o botão de upgrade
+    // Configure the upgrade button
     const upgradeBtn = proModal.querySelector('#upgradeBtn');
     if (upgradeBtn) {
       upgradeBtn.addEventListener('click', async () => {
@@ -884,7 +884,7 @@ async function updateProButton() {
   const proBtn = document.getElementById('proBtn');
   if (proBtn) {
     proBtn.textContent = isPro ? 'Pro' : 'Free';
-    proBtn.title = isPro ? 'Pro Version' : 'Upgrade para Pro';
+    proBtn.title = isPro ? 'Pro Version' : 'Upgrade to Pro';
     proBtn.className = isPro ? 'pro-btn is-pro' : 'pro-btn';
   }
 }
@@ -893,7 +893,7 @@ function updatePinButton() {
   const pinBtn = document.getElementById('pinBtn');
   if (pinBtn) {
     pinBtn.classList.toggle('active', isPinned);
-    pinBtn.title = isPinned ? 'Desafixar janela' : 'Fixar janela';
+    pinBtn.title = isPinned ? 'Unpin window' : 'Pin window';
   }
 }
 
@@ -921,7 +921,7 @@ function setupSettingsModal() {
       const data = await chrome.storage.local.get(['isPro', 'maxClips', 'maxFavorites']);
       const isPro = data.isPro || false;
       
-      // Atualizar limites baseado no status Pro
+      // Update limits based on Pro status
       const maxClipsInput = document.getElementById('maxClips');
       const maxFavoritesInput = document.getElementById('maxFavorites');
       
@@ -929,7 +929,7 @@ function setupSettingsModal() {
         if (maxClipsInput) {
           maxClipsInput.removeAttribute('max');
           maxClipsInput.removeAttribute('disabled');
-          // Se o valor atual for o padrão ou menor que o limite não-Pro, define 1000
+          // If the current value is the default or less than the non-Pro limit, set to 1000
           if (!data.maxClips || data.maxClips <= 50) {
             maxClipsInput.value = '1000';
           }
@@ -937,13 +937,13 @@ function setupSettingsModal() {
         if (maxFavoritesInput) {
           maxFavoritesInput.removeAttribute('max');
           maxFavoritesInput.removeAttribute('disabled');
-          // Se o valor atual for o padrão ou menor que o limite não-Pro, define 1000
+          // If the current value is the default or less than the non-Pro limit, set to 1000
           if (!data.maxFavorites || data.maxFavorites <= 5) {
             maxFavoritesInput.value = '1000';
           }
         }
         
-        // Esconder dicas Pro
+        // Hide Pro hints
         document.querySelectorAll('.pro-hint').forEach(hint => {
           hint.style.display = 'none';
         });
@@ -981,13 +981,13 @@ function setupSettingsModal() {
       await chrome.storage.local.set(settings);
       settingsModal.style.display = 'none';
       
-      // Atualizar a UI
+      // Update UI
       await loadClips();
       await loadFavorites();
     });
   }
 
-  // Fechar modal ao clicar fora
+  // Close modal when clicking outside
   window.addEventListener('click', (event) => {
     if (event.target === settingsModal) {
       settingsModal.style.display = 'none';
@@ -1020,7 +1020,7 @@ async function initializeSettings() {
     }
   }
   
-  // Esconder as dicas Pro se o usuário for Pro
+  // Hide Pro hints if user is Pro
   if (isPro) {
     document.querySelectorAll('.pro-hint').forEach(hint => {
       hint.style.display = 'none';
@@ -1028,13 +1028,13 @@ async function initializeSettings() {
   }
 }
 
-// Setup pro hints click handlers
+// Setup Pro hints click handlers
 function setupProHints() {
   const proHints = document.querySelectorAll('.pro-hint');
   const proModal = document.getElementById('proModal');
   const upgradeBtn = document.getElementById('upgradeBtn');
 
-  // Event listener para o botão de upgrade
+  // Event listener for the upgrade button
   if (upgradeBtn) {
     upgradeBtn.addEventListener('click', async () => {
       await startCheckout();
@@ -1050,7 +1050,7 @@ function setupProHints() {
     });
   });
 
-  // Event listener para o botão de fechar
+  // Event listener for the close button
   const closeBtn = proModal?.querySelector('.close-btn');
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
@@ -1112,7 +1112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     proModal.style.display = 'none';
     await updateProButton();
     
-    // Se tiver texto no campo de busca, fazer a busca semântica automaticamente
+    // If there's text in the search field, perform semantic search automatically
     const searchInput = document.getElementById('searchInput');
     const aiSearchBtn = document.getElementById('aiSearchBtn');
     if (searchInput.value.trim()) {

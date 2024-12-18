@@ -229,7 +229,9 @@ h1 {
 
 .clip-list {
   display: none;
-  height: 70%;
+  height: 100% !important; /* Força a altura */
+  min-height: 100%; /* Garante altura mínima */
+  flex: 1 1 auto; /* Permite que o elemento cresça e encolha conforme necessário */
   overflow-y: auto;
   max-height: 400px;
   padding-right: 2px; /* Compensate for scrollbar width */
@@ -315,10 +317,11 @@ h1 {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 0.5rem;
   text-align: center;
   height: 100%;
   color: var(--secondary-color);
+  gap: 0.5rem;
 }
 
 .empty-state svg {
