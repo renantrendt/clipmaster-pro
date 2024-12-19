@@ -118,7 +118,14 @@ async function handleNewClip(text) {
 async function handleSemanticSearch(query) {
   try {
     const { recentClips, favoriteClips } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    const allClips = [...recentClips, ...favoriteClips].map(clip => clip.text);
+    const allClips = [...recentClips, ...favoriteClips].map(clip => {
+      // Combine clip text with its metadata into a single searchable string
+      let searchableText = clip.text;
+      if (clip.appName) searchableText += ` | App: ${clip.appName}`;
+      if (clip.tabTitle) searchableText += ` | Tab: ${clip.tabTitle}`;
+      if (clip.tabUrl) searchableText += ` | URL: ${clip.tabUrl}`;
+      return searchableText;
+    });
     
     // Log para debug
     console.log('Sending semantic search request:', {
@@ -157,9 +164,14 @@ async function handleSemanticSearch(query) {
       return { success: false, error: 'Invalid response format from search' };
     }
 
+    // Map the results back to original clip texts (removing metadata)
+    const results = data.results.map(result => {
+      return result.split(' | ')[0]; // Get only the original text part
+    });
+
     return { 
       success: true, 
-      results: data.results,
+      results,
       debug: { // Incluir informações de debug na resposta
         totalClips: allClips.length,
         responseData: data
