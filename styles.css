@@ -64,6 +64,8 @@ h1 {
 
 .search-container {
   position: relative;
+  margin-right: 16px;
+  max-width: 100%;
   flex: 1;
   min-width: 0; /* Permite que o container encolha se necessário */
 }
