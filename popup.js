@@ -353,8 +353,19 @@ function createClipElement(clip, isFavorite = false) {
         chrome.tabs.sendMessage(tab.id, { action: 'paste', text: clip.text });
       }
       
-      // Close popup after a short delay
-      setTimeout(() => window.close(), 100);
+      // Check if we're in the pinned window before closing
+      const currentWindow = await chrome.windows.getCurrent();
+      const { pinnedWindowId: storedPinnedWindowId } = await chrome.storage.local.get('pinnedWindowId');
+      
+      // Only close if this is not the pinned window
+      if (currentWindow.id !== storedPinnedWindowId) {
+        setTimeout(() => window.close(), 100);
+      } else {
+        // Se estamos na janela pinada, apenas dê feedback visual temporário
+        setTimeout(() => {
+          clipElement.classList.remove('clicked');
+        }, 300);
+      }
     } catch (error) {
       console.error('Error:', error);
       clipElement.classList.remove('clicked');
