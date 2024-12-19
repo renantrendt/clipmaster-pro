@@ -85,10 +85,16 @@ async function handleNewClip(text) {
 
     const { recentClips = [], maxClips = 50 } = await chrome.storage.local.get(['recentClips', 'maxClips']);
     
+    // Get active tab information
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
     const newClip = {
       id: Date.now(),
       text,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      appName: activeTab?.title?.split(' - ').pop() || 'Unknown', // Usually the app name is the last part of the title
+      tabTitle: activeTab?.title || 'Unknown',
+      tabUrl: activeTab?.url || 'Unknown'
     };
 
     const existingIndex = recentClips.findIndex(clip => clip.text === text);
