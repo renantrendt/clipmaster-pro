@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ClipMaster Pro",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Advanced clipboard manager with premium features including semantic search, unlimited storage, and floating window",
   "author": "renan@renanserrano.com.br",
   "homepage_url": "https://github.com/renantrendt/clipmaster-pro",
@@ -11,7 +11,8 @@
     "clipboardWrite",
     "scripting",
     "activeTab",
-    "tabs"
+    "tabs",
+    "nativeMessaging"
   ],
   "content_scripts": [
     {

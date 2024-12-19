@@ -356,10 +356,30 @@ function createClipElement(clip, isFavorite = false) {
       // Visual feedback
       clipElement.classList.add('clicked');
       
-      // Get active tab and send paste message
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab) {
-        chrome.tabs.sendMessage(tab.id, { action: 'paste', text: clip.text });
+      // Tenta colar no Chrome primeiro
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+          try {
+            await chrome.tabs.sendMessage(tab.id, { action: 'paste', text: clip.text });
+          } catch (error) {
+            // Se falhar, tenta usar o script nativo para colar em qualquer lugar
+            try {
+              const port = chrome.runtime.connectNative('com.clipmaster.paste');
+              port.onDisconnect.addListener((p) => {
+                if (chrome.runtime.lastError) {
+                  console.error('Failed to connect:', chrome.runtime.lastError.message);
+                }
+              });
+              port.postMessage({ text: clip.text });
+              port.disconnect();
+            } catch (nativeError) {
+              console.error('Native paste error:', nativeError);
+            }
+          }
+        }
+      } catch (error) {
+        console.log('Tab communication error:', error);
       }
       
       // Check if we're in the pinned window before closing
