@@ -155,6 +155,15 @@ function setupEventListeners() {
     }
   });
 
+  // Search input events
+  searchInput.addEventListener('keydown', (event) => {
+    // Se pressionar Enter, clica no botão de AI Search
+    if (event.key === 'Enter' || event.key === 'Return') {
+      event.preventDefault(); // Previne qualquer comportamento padrão
+      aiSearchBtn.click(); // Simula o clique no botão
+    }
+  });
+
   // Settings Modal
   const settingsBtn = document.getElementById('settingsBtn');
   if (settingsBtn) {
@@ -812,7 +821,7 @@ function showEmptyState(isSemanticSearch = false) {
       </svg>
       <p class="empty-state-title">${title}</p>
       <p class="empty-state-description">${description}</p>
-      ${isSemanticSearch || !isRecent ? '' : '<p class="empty-state-suggestion">Click on the 🔍 button to use AI search</p>'}
+      ${isSemanticSearch || !isRecent ? '' : '<p class="empty-state-suggestion">Click on the 🔍 or press enter/return button to use AI search</p>'}
     </div>
   `;
 }
