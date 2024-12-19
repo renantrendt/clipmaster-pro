@@ -25,6 +25,12 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "popup.js", "styles.css"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "host_permissions": [
     "<all_urls>"
   ],

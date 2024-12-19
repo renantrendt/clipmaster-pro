@@ -40,7 +40,13 @@ async function checkClipboard() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) return;
 
+    // Skip checking clipboard for chrome:// and edge:// URLs
     if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
+      return;
+    }
+
+    // Skip checking clipboard for extension pages
+    if (tab.url.includes('chrome-extension://')) {
       return;
     }
 
@@ -61,7 +67,11 @@ async function checkClipboard() {
       await handleNewClip(clipboardContent);
     }
   } catch (error) {
-    console.error('Error checking clipboard:', error);
+    // Only log errors that aren't related to expected scenarios
+    if (!error.message.includes('Cannot access contents of url') && 
+        !error.message.includes('chrome-extension://')) {
+      console.error('Error checking clipboard:', error);
+    }
   }
 }
 

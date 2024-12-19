@@ -354,18 +354,24 @@ function createClipElement(clip, isFavorite = false) {
       // Visual feedback
       clipElement.classList.add('clicked');
       
-      // Get active tab and send paste message
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab) {
-        chrome.tabs.sendMessage(tab.id, { action: 'paste', text: clip.text });
-      }
-      
-      // Check if we're in the pinned window before closing
+      // Get current window to check if we're in the pinned window
       const currentWindow = await chrome.windows.getCurrent();
       const { pinnedWindowId: storedPinnedWindowId } = await chrome.storage.local.get('pinnedWindowId');
       
-      // Only close if this is not the pinned window
+      // Only try to send message if we're not in the pinned window
       if (currentWindow.id !== storedPinnedWindowId) {
+        try {
+          // Get active tab and send paste message
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tab && !tab.url.includes('chrome-extension://')) {
+            await chrome.tabs.sendMessage(tab.id, { action: 'paste', text: clip.text });
+          }
+        } catch (msgError) {
+          // Ignore message sending errors as they're expected in some cases
+          console.debug('Message not sent:', msgError.message);
+        }
+        
+        // Close popup after a short delay
         setTimeout(() => window.close(), 100);
       } else {
         // Se estamos na janela pinada, apenas dê feedback visual temporário
@@ -374,7 +380,7 @@ function createClipElement(clip, isFavorite = false) {
         }, 300);
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error copying to clipboard:', error);
       clipElement.classList.remove('clicked');
     }
   });
