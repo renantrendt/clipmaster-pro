@@ -75,10 +75,17 @@ async function handleNewClip(text) {
 
     const { recentClips = [], maxClips = 50 } = await chrome.storage.local.get(['recentClips', 'maxClips']);
     
+    // Get current tab info for metadata
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
     const newClip = {
       id: Date.now(),
       text,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      app: tab?.url ? new URL(tab.url).hostname : 'unknown',
+      title: tab?.title || 'unknown',
+      url: tab?.url || 'unknown',
+      copiedAt: new Date().toISOString()
     };
 
     const existingIndex = recentClips.findIndex(clip => clip.text === text);
@@ -102,12 +109,17 @@ async function handleNewClip(text) {
 async function handleSemanticSearch(query) {
   try {
     const { recentClips, favoriteClips } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    const allClips = [...recentClips, ...favoriteClips].map(clip => clip.text);
+    
+    // Criar dois arrays: um para exibição e outro para busca
+    const displayClips = [...recentClips, ...favoriteClips].filter(clip => clip && clip.text);
+    const searchClips = displayClips.map(clip => 
+      `${clip.text} (From: ${clip.app || 'unknown'} | Title: ${clip.title || 'unknown'} | URL: ${clip.url || 'unknown'} | Copied: ${clip.copiedAt || 'unknown'})`
+    );
     
     // Log para debug
     console.log('Sending semantic search request:', {
       query,
-      clips: allClips
+      clips: searchClips
     });
 
     const response = await fetch('https://vsqjdfxsbgdlmihbzmcr.supabase.co/functions/v1/semantic-search', {
@@ -118,7 +130,7 @@ async function handleSemanticSearch(query) {
       },
       body: JSON.stringify({
         query,
-        clips: allClips
+        clips: searchClips
       })
     });
 
@@ -129,23 +141,26 @@ async function handleSemanticSearch(query) {
     const data = await response.json();
     
     // Log para debug
-    console.log('Semantic search response from Supabase:', data);
+    console.log('Semantic search response:', data);
 
     if (data.error) {
       throw new Error(data.error);
     }
 
-    // A Edge Function retorna os resultados diretamente
     if (!data.results || !Array.isArray(data.results)) {
-      console.warn('Invalid response format:', data);
-      return { success: false, error: 'Invalid response format from search' };
+      throw new Error('Invalid response format from search');
     }
+
+    // Mapear os índices de volta para os clips originais, filtrando índices inválidos
+    const validResults = data.results
+      .map(index => displayClips[index - 1])
+      .filter(clip => clip && clip.text);
 
     return { 
       success: true, 
-      results: data.results,
-      debug: { // Incluir informações de debug na resposta
-        totalClips: allClips.length,
+      results: validResults,
+      debug: {
+        totalClips: searchClips.length,
         responseData: data
       }
     };
