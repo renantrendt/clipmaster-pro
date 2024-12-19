@@ -799,10 +799,14 @@ function showEmptyState(isSemanticSearch = false) {
   const list = document.querySelector(`.clip-list[data-tab="${currentTab}"]`);
   if (!list) return;
 
+  const searchInput = document.getElementById('searchInput');
   const isRecent = currentTab === 'recent';
+  const isSearch = searchInput ? searchInput.value.trim().length > 0 : false;
   const title = isSemanticSearch ? 'No similar clips found' : 
+                isSearch ? 'No clips found' :
                 isRecent ? 'No recent clips' : 'No favorite clips';
   const description = isSemanticSearch ? 'Try a different search term' :
+                     isSearch ? 'Try a different search term' :
                      isRecent ? 'Open a new tab and copy your first text' :
                      'Star your first clip to save it here';
 
@@ -819,7 +823,7 @@ function showEmptyState(isSemanticSearch = false) {
       </svg>
       <p class="empty-state-title">${title}</p>
       <p class="empty-state-description">${description}</p>
-      ${isSemanticSearch || !isRecent ? '' : '<p class="empty-state-suggestion">Click on the 🔍 or press Enter to use AI search</p>'}
+      ${isSearch && !isSemanticSearch ? '<p class="empty-state-suggestion">Click on the 🔍 or press Enter to use AI search</p>' : ''}
     </div>
   `;
 }
