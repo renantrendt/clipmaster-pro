@@ -1,6 +1,6 @@
 {
   "name": "chrome-extension",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "A Chrome extension to manage your clipboard history with advanced features.",
   "main": "background.js",
   "scripts": {
