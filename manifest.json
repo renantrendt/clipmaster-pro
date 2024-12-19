@@ -1,5 +1,5 @@
 {
-  "manifest_version": 4,
+  "manifest_version": 3,
   "name": "ClipMaster Pro",
   "version": "1.0.4",
   "description": "Advanced clipboard manager with premium features including semantic search, unlimited storage, and floating window",
