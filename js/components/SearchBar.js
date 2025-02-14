@@ -11,6 +11,8 @@ function debounce(func, wait) {
   };
 }
 
+import { AISearchButton } from './AISearchButton.js';
+
 export class SearchBar {
   constructor(options = {}) {
     this.container = null;
@@ -44,18 +46,21 @@ export class SearchBar {
   render() {
     this.container.innerHTML = `
       <div class="search-container">
-        <input type="text" id="searchInput" placeholder="Search clips...">
+        <div class="search-input-wrapper">
+          <input type="text" id="searchInput" placeholder="Search clips...">
+        </div>
       </div>
-      <button id="aiSearchBtn" class="ai-search-btn" title="AI Search">
-        <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-      </button>
     `;
 
     this.searchInput = this.container.querySelector('#searchInput');
-    this.aiSearchBtn = this.container.querySelector('#aiSearchBtn');
+    
+    // Initialize AI Search Button
+    this.aiSearchBtn = new AISearchButton({
+      isPro: this.isPro,
+      onAISearch: () => this.performSearch(true),
+      onShowProModal: () => this.onShowProModal()
+    });
+    this.aiSearchBtn.mount(this.container);
   }
 
   setupEventListeners() {
@@ -97,20 +102,7 @@ export class SearchBar {
       }
     });
 
-    // AI Search button
-    this.aiSearchBtn.addEventListener('click', async () => {
-      const query = this.searchInput.value.trim();
-      if (!query) return;
 
-      try {
-        this.aiSearchBtn.disabled = true;
-        this.aiSearchBtn.classList.add('loading');
-        await this.onAISearch(true);
-      } finally {
-        this.aiSearchBtn.disabled = false;
-        this.aiSearchBtn.classList.remove('loading');
-      }
-    });
   }
 
   getValue() {
