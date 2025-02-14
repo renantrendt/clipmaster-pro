@@ -1,23 +1,12 @@
-// Utility functions
-export function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
+import { SearchBar } from './js/components/SearchBar.js';
 
 let currentTab = 'recent';
 let isPro = false;
 let isPinned = false;
 let recentClips = [];
 let favoriteClips = [];
-let isSemanticSearchActive = false;
-let lastSearchResults = null;
+let searchBar;
+
 const DEFAULT_RECENT_LIMIT = 50;
 const DEFAULT_FAVORITES_LIMIT = 10;
 const PRO_LIMIT = 1000;
@@ -85,7 +74,7 @@ async function updateRecentList(recentClips, favoriteClips) {
   recentList.innerHTML = '';
   
   if (recentClips.length === 0) {
-    showEmptyState(false);
+    searchBar.showEmptyState(false);
     return;
   }
   
@@ -109,60 +98,20 @@ function setupEventListeners() {
     });
   });
 
-  // Search input
-  const searchInput = document.getElementById('searchInput');
-  const debouncedSearch = debounce(() => performSearch(false), 300);
-  searchInput.addEventListener('input', debouncedSearch);
-  
-  // Handle cursor style for the X button
-  searchInput.addEventListener('mousemove', (e) => {
-    const rect = searchInput.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x > rect.width - 24 && searchInput.value) {
-      searchInput.style.cursor = 'pointer';
-    } else {
-      searchInput.style.cursor = 'text';
-    }
+  // Initialize SearchBar component
+  searchBar = new SearchBar({
+    onSearch: (query) => searchBar.performSearch(false),
+    onAISearch: (query) => searchBar.performSearch(true),
+    onClear: updateUI,
+    onLoadMore: () => loadClips(true),
+    onUpdateUI: updateUI,
+    onShowEmpty: () => searchBar.showEmptyState(searchBar.isSemanticSearchActive),
+    onShowProModal: () => toggleModal('proModal', true),
+    getCurrentTab: () => currentTab,
+    isPro: isPro
   });
-  
-  searchInput.addEventListener('mouseleave', () => {
-    searchInput.style.cursor = 'text';
-  });
-
-  // Handle click on the X button
-  searchInput.addEventListener('click', (e) => {
-    const rect = searchInput.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x > rect.width - 24 && searchInput.value) {
-      searchInput.value = '';
-      removeSearchMoreButton();
-      updateUI();
-    }
-  });
-
-  // AI Search button
-  const aiSearchBtn = document.getElementById('aiSearchBtn');
-  aiSearchBtn.addEventListener('click', async () => {
-    const query = document.getElementById('searchInput').value.trim();
-    if (!query) return;
-    
-    try {
-      aiSearchBtn.disabled = true;
-      aiSearchBtn.classList.add('loading');
-      await performSearch(true);
-    } finally {
-      aiSearchBtn.disabled = false;
-      aiSearchBtn.classList.remove('loading');
-    }
-  });
-// Search input events
-searchInput.addEventListener('keydown', (event) => {
-  // Se pressionar Enter, clica no botão de AI Search
-  if (event.key === 'Enter' || event.key === 'Return') {
-    event.preventDefault(); // Previne qualquer comportamento padrão
-    aiSearchBtn.click(); // Simula o clique no botão
-  }
-});
+  searchBar.init(document.getElementById('searchBarContainer'));
+  searchBar.updateSearchState();
   // Settings Modal
   const settingsBtn = document.getElementById('settingsBtn');
   if (settingsBtn) {
@@ -225,7 +174,7 @@ async function switchTab(tab) {
   if (!tab) return;
   
   // Remove search more button when switching tabs
-  removeSearchMoreButton();
+  searchBar.removeSearchMoreButton();
   
   // Update current tab
   currentTab = tab;
@@ -247,26 +196,26 @@ async function switchTab(tab) {
     await loadClips(false);
     
     // Check if there's an active search
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput && searchInput.value.trim()) {
+    const query = searchBar.getValue();
+    if (query) {
       // If there's a search query and we have results, use them
-      if (lastSearchResults) {
+      if (searchBar.lastSearchResults) {
         if (currentTab === 'recent') {
-          updateList('recentList', lastSearchResults, favoriteClips);
+          updateList('recentList', searchBar.lastSearchResults, favoriteClips);
         } else {
-          const favoriteResults = lastSearchResults.filter(clip => 
+          const favoriteResults = searchBar.lastSearchResults.filter(clip => 
             favoriteClips.some(f => f.text === clip.text)
           );
           updateList('favoritesList', favoriteResults, favoriteClips);
         }
         
         // Show empty state if needed
-        if (lastSearchResults.length === 0) {
-          showEmptyState(isSemanticSearchActive);
+        if (searchBar.lastSearchResults.length === 0) {
+          searchBar.showEmptyState(searchBar.isSemanticSearchActive);
         }
       } else {
         // If no cached results, perform the search again
-        performSearch(isSemanticSearchActive);
+        searchBar.performSearch(searchBar.isSemanticSearchActive);
       }
     } else {
       // If no search, load all clips
@@ -298,35 +247,10 @@ async function switchTab(tab) {
   }
 }
 
-const TOKEN_LIMIT = 4000; // Approximate token limit for search
-let processedRecentClips = new Set();
-let processedFavoriteClips = new Set();
-let remainingRecentClips = [];
+
 let remainingFavoriteClips = [];
 
-// Calculate approximate token count for a text
-function estimateTokenCount(text) {
-  // Rough estimation: 1 token ≈ 4 characters
-  return Math.ceil(text.length / 4);
-}
 
-// Get next chunk of clips that fits within token limit
-function getNextChunk(clips, tokenLimit) {
-  let totalTokens = 0;
-  const chunk = [];
-  
-  for (const clip of clips) {
-    const tokenCount = estimateTokenCount(clip.text);
-    if (totalTokens + tokenCount <= tokenLimit) {
-      chunk.push(clip);
-      totalTokens += tokenCount;
-    } else {
-      break;
-    }
-  }
-  
-  return chunk;
-}
 
 // Load clips based on current tab
 export async function loadClips(loadMore = false) {
@@ -398,7 +322,7 @@ async function updateList(listId, clips, favoriteClips) {
   
   // Check if there are clips to show
   if (!clips || clips.length === 0) {
-    showEmptyState(false);
+    searchBar.showEmptyState(false);
     return;
   }
   
@@ -672,168 +596,7 @@ async function checkPinnedWindow() {
   }
 }
 
-// Search for clips
-export // Remove search more button from the DOM
-function removeSearchMoreButton() {
-  const searchMoreBtn = document.getElementById('searchMoreBtn');
-  if (searchMoreBtn) {
-    searchMoreBtn.remove();
-  }
-}
 
-// Create and add search more button
-function addSearchMoreButton(parentElementId) {
-  removeSearchMoreButton(); // Remove any existing button first
-  const searchMoreBtn = document.createElement('button');
-  searchMoreBtn.id = 'searchMoreBtn';
-  searchMoreBtn.className = 'search-more-btn';
-  searchMoreBtn.textContent = 'Pesquisar mais resultados';
-  searchMoreBtn.addEventListener('click', () => loadClips(true));
-  document.getElementById(parentElementId).parentNode.appendChild(searchMoreBtn);
-}
-
-async function performSearch(isSemanticSearch = false, isAutoLoading = false) {
-  const searchInput = document.getElementById('searchInput');
-  const query = searchInput.value.trim().toLowerCase();
-  
-  if (!query) {
-    isSemanticSearchActive = false;
-    lastSearchResults = null;
-    updateUI();
-    removeSearchMoreButton();
-    return;
-  }
-
-  try {
-    const { recentClips = [], favoriteClips = [], isPro = false } = 
-      await chrome.storage.local.get(['recentClips', 'favoriteClips', 'isPro']);
-    let results;
-
-    if (isSemanticSearch) {
-      if (!isPro) {
-        const proModal = document.getElementById('proModal');
-        if (proModal) {
-          proModal.style.display = 'block';
-        }
-        return;
-      }
-      
-      results = await performSemanticSearch(query, isAutoLoading);
-      isSemanticSearchActive = true;
-      
-      // Manage search more button
-      const hasMore = currentTab === 'recent' ? 
-        remainingRecentClips.length > 0 : 
-        remainingFavoriteClips.length > 0;
-      
-      if (results.length > 0 && hasMore) {
-        addSearchMoreButton(currentTab === 'recent' ? 'recentList' : 'favoritesList');
-      } else {
-        removeSearchMoreButton();
-      }
-    } else {
-      // Ensure all clips have text property and are unique
-      const uniqueClips = new Map();
-      [...recentClips, ...favoriteClips].forEach(clip => {
-        if (clip && typeof clip.text === 'string' && !uniqueClips.has(clip.text)) {
-          uniqueClips.set(clip.text, clip);
-        }
-      });
-      
-      results = Array.from(uniqueClips.values()).filter(clip => 
-        clip.text.toLowerCase().includes(query)
-      );
-      isSemanticSearchActive = false;
-    }
-
-    lastSearchResults = results;
-
-    if (currentTab === 'recent') {
-      updateList('recentList', results, favoriteClips);
-    } else {
-      const favoriteResults = results.filter(clip => 
-        favoriteClips.some(f => f.text === clip.text)
-      );
-      updateList('favoritesList', favoriteResults, favoriteClips);
-    }
-
-    // Only show empty state if no results were found and we're not auto-loading
-    if (results.length === 0 && !isAutoLoading) {
-      showEmptyState(isSemanticSearchActive);
-    }
-  } catch (error) {
-    console.error('Search error:', error);
-    showEmptyState(isSemanticSearchActive);
-  }
-}
-
-// Perform semantic search
-async function performSemanticSearch(query, isAutoLoading = false) {
-  try {
-    // Get current clips based on active tab
-    const currentClips = currentTab === 'recent' ? recentClips : favoriteClips;
-    
-    const response = await chrome.runtime.sendMessage({
-      action: 'semanticSearch',
-      query: query,
-      clips: currentClips
-    });
-
-    if (!response || !response.success) {
-      throw new Error(response?.error || 'Semantic search failed');
-    }
-
-    console.log('Semantic search response:', response);
-
-    if (!response.results || !Array.isArray(response.results)) {
-      console.warn('No results or invalid results format:', response);
-      return [];
-    }
-
-    // Get existing clips for comparison
-    const { recentClips: allRecent = [], favoriteClips: allFavorites = [] } = 
-      await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    const existingClips = [...allRecent, ...allFavorites];
-
-    // Normalize and deduplicate results
-    const uniqueResults = new Set(response.results.map(result => 
-      typeof result === 'string' ? result : result.text
-    ));
-
-    const results = Array.from(uniqueResults).map(text => {
-      // Check if this text already exists in any clip
-      const existingClip = existingClips.find(clip => clip.text === text);
-      if (existingClip) {
-        return existingClip;
-      }
-
-      // Create new clip with consistent structure
-      return {
-        text: text,
-        timestamp: new Date().toISOString()
-      };
-    });
-
-    // If no results found and not already auto-loading, try loading more clips
-    if (results.length === 0 && !isAutoLoading) {
-      const hasMore = currentTab === 'recent' ? 
-        remainingRecentClips.length > 0 : 
-        remainingFavoriteClips.length > 0;
-      
-      if (hasMore) {
-        // Load more clips
-        await loadClips(true);
-        // Recursively search in the new chunks
-        return performSemanticSearch(query, true);
-      }
-    }
-
-    return results;
-  } catch (error) {
-    console.error('Semantic search error:', error);
-    throw error;
-  }
-}
 
 // Save settings
 async function saveSettings() {
@@ -910,10 +673,10 @@ async function toggleFavorite(clip) {
     recentClips = savedRecent;
     
     // Check if we're in a search
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput && searchInput.value.trim()) {
+    const query = searchBar.getValue();
+    if (query) {
       // Re-run the search to update the filtered results
-      performSearch(isSemanticSearchActive);
+      searchBar.performSearch(searchBar.isSemanticSearchActive);
     } else {
       // Update both lists to reflect changes
       if (currentTab === 'recent') {
@@ -957,44 +720,9 @@ async function saveClips() {
 }
 
 // UI Helpers
-function updateSearchState() {
-  const searchInput = document.getElementById('searchInput');
-  searchInput.disabled = !isPro;
-  searchInput.title = isPro ? 'Search your clips' : 'Available only in Pro version';
-}
 
-function showEmptyState(isSemanticSearch = false) {
-  const list = document.querySelector(`.clip-list[data-tab="${currentTab}"]`);
-  if (!list) return;
 
-  const searchInput = document.getElementById('searchInput');
-  const isRecent = currentTab === 'recent';
-  const isSearch = searchInput ? searchInput.value.trim().length > 0 : false;
-  const title = isSemanticSearch ? 'No similar clips found' : 
-                isSearch ? 'No clips found' :
-                isRecent ? 'No recent clips' : 'No favorite clips';
-  const description = isSemanticSearch ? 'Try a different search term' :
-                     isSearch ? 'Try a different search term' :
-                     isRecent ? 'Open a new tab and copy your first text' :
-                     'Star your first clip to save it here';
 
-  list.innerHTML = `
-    <div class="empty-state">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        ${isRecent ? `
-          <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M12 15V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        ` : `
-          <path d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        `}
-      </svg>
-      <p class="empty-state-title">${title}</p>
-      <p class="empty-state-description">${description}</p>
-      ${isSearch && !isSemanticSearch ? '<p class="empty-state-suggestion">Click on the 🔍 or press Enter to use AI search</p>' : ''}
-    </div>
-  `;
-}
 
 // Stripe Integration
 async function startCheckout() {
@@ -1019,11 +747,7 @@ async function startCheckout() {
   });
   
   // Enable search
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.disabled = false;
-    searchInput.title = 'Search your clips';
-  }
+  searchBar.updateSearchState();
   
   // Update UI
   await loadSettings();
@@ -1041,11 +765,7 @@ async function checkProStatus() {
       hint.style.display = 'none';
     });
     
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-      searchInput.disabled = false;
-      searchInput.title = 'Search your clips';
-    }
+    searchBar.updateSearchState();
   }
   
   return isPro;
@@ -1260,7 +980,7 @@ async function updateUI() {
       updateList('favoritesList', favoriteClips, favoriteClips);
     }
     
-    updateSearchState();
+    searchBar.updateSearchState();
     updateProButton();
     updatePinButton();
   } catch (error) {
@@ -1314,9 +1034,9 @@ document.addEventListener('DOMContentLoaded', () => {
     await updateProButton();
     
     // If there's text in the search field, perform semantic search automatically
-    const searchInput = document.getElementById('searchInput');
+    const query = searchBar.getValue();
     const aiSearchBtn = document.getElementById('aiSearchBtn');
-    if (searchInput.value.trim()) {
+    if (query) {
       aiSearchBtn.click();
     }
   });

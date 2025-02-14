@@ -44,40 +44,68 @@ let lastClipboardContent = '';
 async function checkClipboard() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) return;
+    if (!tab || !tab.id) return;
 
-    // Skip checking clipboard for chrome:// and edge:// URLs
-    if (tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
+    // Lista de URLs que devemos ignorar
+    const skipUrls = [
+      'chrome://',
+      'edge://',
+      'chrome-extension://',
+      'about:',
+      'file:',
+      'view-source:'
+    ];
+
+    // Verifica se a URL atual deve ser ignorada
+    if (skipUrls.some(url => tab.url?.startsWith(url))) {
       return;
     }
 
-    // Skip checking clipboard for extension pages
-    if (tab.url.includes('chrome-extension://')) {
+    // Verifica se a página está carregada corretamente
+    if (tab.status !== 'complete' || tab.url === '') {
       return;
     }
 
-    const result = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: () => {
-        return new Promise((resolve) => {
-          navigator.clipboard.readText()
-            .then(text => resolve(text))
-            .catch(() => resolve(''));
-        });
+    try {
+      const result = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          return new Promise((resolve) => {
+            navigator.clipboard.readText()
+              .then(text => resolve({ success: true, text }))
+              .catch(error => resolve({ success: false, error: error.message }));
+          });
+        }
+      });
+
+      if (!result || !result[0] || !result[0].result) return;
+
+      const { success, text, error } = result[0].result;
+      if (!success) {
+        console.debug('Clipboard access denied:', error);
+        return;
       }
-    });
 
-    const clipboardContent = result[0].result;
-    if (clipboardContent && clipboardContent !== lastClipboardContent) {
-      lastClipboardContent = clipboardContent;
-      await handleNewClip(clipboardContent);
+      if (text && text !== lastClipboardContent) {
+        lastClipboardContent = text;
+        await handleNewClip(text);
+      }
+    } catch (scriptError) {
+      // Ignora erros específicos que são esperados
+      const expectedErrors = [
+        'Cannot access contents of url',
+        'Frame with ID',
+        'The extensions gallery cannot be scripted',
+        'Missing host permission for the tab'
+      ];
+
+      if (!expectedErrors.some(msg => scriptError.message?.includes(msg))) {
+        console.error('Script execution error:', scriptError);
+      }
     }
   } catch (error) {
-    // Only log errors that aren't related to expected scenarios
-    if (!error.message.includes('Cannot access contents of url') && 
-        !error.message.includes('chrome-extension://')) {
-      console.error('Error checking clipboard:', error);
-    }
+    // Log apenas erros inesperados
+    console.error('Unexpected error in checkClipboard:', error);
   }
 }
 
