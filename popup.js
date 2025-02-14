@@ -1,5 +1,5 @@
 // Utility functions
-function debounce(func, wait) {
+export function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
     const later = () => {
@@ -135,6 +135,7 @@ function setupEventListeners() {
     const x = e.clientX - rect.left;
     if (x > rect.width - 24 && searchInput.value) {
       searchInput.value = '';
+      removeSearchMoreButton();
       updateUI();
     }
   });
@@ -222,6 +223,9 @@ searchInput.addEventListener('keydown', (event) => {
 // Switch between tabs
 async function switchTab(tab) {
   if (!tab) return;
+  
+  // Remove search more button when switching tabs
+  removeSearchMoreButton();
   
   // Update current tab
   currentTab = tab;
@@ -325,7 +329,7 @@ function getNextChunk(clips, tokenLimit) {
 }
 
 // Load clips based on current tab
-async function loadClips(loadMore = false) {
+export async function loadClips(loadMore = false) {
   try {
     const currentTab = document.querySelector('.tab-btn.active').dataset.tab;
     const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
@@ -362,12 +366,6 @@ async function loadClips(loadMore = false) {
       // Always load all favorites for the favorite button state
       favoriteClips = savedFavorites.slice(0, maxFavorites);
       updateRecentList(recentClips, favoriteClips);
-
-      // Update search more button for recent tab
-      const searchMoreBtn = document.getElementById('searchMoreBtn');
-      if (searchMoreBtn) {
-        searchMoreBtn.style.display = remainingRecentClips.length > 0 ? 'block' : 'none';
-      }
     } else {
       // Get next chunk of favorite clips
       const newClips = getNextChunk(remainingFavoriteClips, TOKEN_LIMIT);
@@ -381,24 +379,7 @@ async function loadClips(loadMore = false) {
       }
       
       updateList('favoritesList', favoriteClips, favoriteClips);
-
-      // Update search more button for favorites tab
-      const searchMoreBtn = document.getElementById('searchMoreBtn');
-      if (searchMoreBtn) {
-        searchMoreBtn.style.display = remainingFavoriteClips.length > 0 ? 'block' : 'none';
-      }
     }
-  } catch (error) {
-    console.error('Error loading clips:', error);
-  }
-} loadMoreBtn = document.createElement('button');
-      loadMoreBtn.id = 'searchMoreBtn';
-      loadMoreBtn.className = 'search-more-btn';
-      loadMoreBtn.textContent = 'Pesquisar mais resultados';
-      loadMoreBtn.addEventListener('click', () => loadClips(true));
-      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
-    }
-    updateList('favoritesList', favoriteClips, favoriteClips);
   } catch (error) {
     console.error('Error loading clips:', error);
   }
@@ -692,6 +673,25 @@ async function checkPinnedWindow() {
 }
 
 // Search for clips
+export // Remove search more button from the DOM
+function removeSearchMoreButton() {
+  const searchMoreBtn = document.getElementById('searchMoreBtn');
+  if (searchMoreBtn) {
+    searchMoreBtn.remove();
+  }
+}
+
+// Create and add search more button
+function addSearchMoreButton(parentElementId) {
+  removeSearchMoreButton(); // Remove any existing button first
+  const searchMoreBtn = document.createElement('button');
+  searchMoreBtn.id = 'searchMoreBtn';
+  searchMoreBtn.className = 'search-more-btn';
+  searchMoreBtn.textContent = 'Pesquisar mais resultados';
+  searchMoreBtn.addEventListener('click', () => loadClips(true));
+  document.getElementById(parentElementId).parentNode.appendChild(searchMoreBtn);
+}
+
 async function performSearch(isSemanticSearch = false, isAutoLoading = false) {
   const searchInput = document.getElementById('searchInput');
   const query = searchInput.value.trim().toLowerCase();
@@ -700,6 +700,7 @@ async function performSearch(isSemanticSearch = false, isAutoLoading = false) {
     isSemanticSearchActive = false;
     lastSearchResults = null;
     updateUI();
+    removeSearchMoreButton();
     return;
   }
 
@@ -720,13 +721,15 @@ async function performSearch(isSemanticSearch = false, isAutoLoading = false) {
       results = await performSemanticSearch(query, isAutoLoading);
       isSemanticSearchActive = true;
       
-      // Update search more button visibility only if we found results
-      const searchMoreBtn = document.getElementById('searchMoreBtn');
-      if (searchMoreBtn) {
-        const hasMore = currentTab === 'recent' ? 
-          remainingRecentClips.length > 0 : 
-          remainingFavoriteClips.length > 0;
-        searchMoreBtn.style.display = (results.length > 0 && hasMore) ? 'block' : 'none';
+      // Manage search more button
+      const hasMore = currentTab === 'recent' ? 
+        remainingRecentClips.length > 0 : 
+        remainingFavoriteClips.length > 0;
+      
+      if (results.length > 0 && hasMore) {
+        addSearchMoreButton(currentTab === 'recent' ? 'recentList' : 'favoritesList');
+      } else {
+        removeSearchMoreButton();
       }
     } else {
       // Ensure all clips have text property and are unique

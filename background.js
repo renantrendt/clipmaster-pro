@@ -1,22 +1,28 @@
-import CONFIG from './config.js';
+import CONFIG from '/config.js';
+import { migrateData, CURRENT_VERSION } from '/js/migrations.js';
 
-// Initialize storage when extension is installed
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('Extension installed/updated');
-  chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips'], function(result) {
-    if (!result.recentClips) {
-      chrome.storage.local.set({ recentClips: [] });
-      console.log('Storage initialized: recentClips');
-    }
-    if (!result.favoriteClips) {
-      chrome.storage.local.set({ favoriteClips: [] });
-      console.log('Storage initialized: favoriteClips');
-    }
-    if (!result.maxClips) {
-      chrome.storage.local.set({ maxClips: 50 });
-      console.log('Storage initialized: maxClips');
-    }
-  });
+// Initialize storage and handle migrations when extension is installed or updated
+chrome.runtime.onInstalled.addListener(async (details) => {
+  console.log('Extension installed/updated:', details.reason);
+
+  // Executar migração de dados
+  await migrateData();
+
+  // Inicializar valores padrão se necessário
+  const result = await chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips']);
+  
+  if (!result.recentClips) {
+    await chrome.storage.local.set({ recentClips: [] });
+    console.log('Storage initialized: recentClips');
+  }
+  if (!result.favoriteClips) {
+    await chrome.storage.local.set({ favoriteClips: [] });
+    console.log('Storage initialized: favoriteClips');
+  }
+  if (!result.maxClips) {
+    await chrome.storage.local.set({ maxClips: 50 });
+    console.log('Storage initialized: maxClips');
+  }
 });
 
 // Listen for messages
