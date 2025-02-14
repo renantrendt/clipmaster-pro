@@ -649,6 +649,26 @@ h1 {
   }
 }
 
+/* Search More Button */
+.search-more-btn {
+  display: block;
+  width: calc(100% - 20px);
+  padding: 8px;
+  margin: 10px;
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  color: var(--text-color);
+}
+
+.search-more-btn:hover {
+  background-color: var(--hover-color);
+}
+
 @media (min-width: 600px) {
   body {
     font-size: 16px;

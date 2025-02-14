@@ -239,6 +239,9 @@ async function switchTab(tab) {
     selectedTab.classList.add('active');
     selectedList.classList.add('active');
     
+    // Reset clips and load new tab content
+    await loadClips(false);
+    
     // Check if there's an active search
     const searchInput = document.getElementById('searchInput');
     if (searchInput && searchInput.value.trim()) {
@@ -273,6 +276,17 @@ async function switchTab(tab) {
       // Update only the active list
       if (tab === 'recent') {
         updateRecentList(recentClips, favoriteClips);
+    
+    // Add load more button if not exists
+    let loadMoreBtn = document.getElementById('loadMoreBtn');
+    if (!loadMoreBtn) {
+      loadMoreBtn = document.createElement('button');
+      loadMoreBtn.id = 'searchMoreBtn';
+      loadMoreBtn.className = 'search-more-btn';
+      loadMoreBtn.textContent = 'Pesquisar mais resultados';
+      loadMoreBtn.addEventListener('click', () => loadClips(true));
+      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
+    }
       } else if (tab === 'favorites') {
         updateList('favoritesList', favoriteClips, favoriteClips);
       }
@@ -280,18 +294,110 @@ async function switchTab(tab) {
   }
 }
 
-// Load clips
-async function loadClips() {
+const TOKEN_LIMIT = 4000; // Approximate token limit for search
+let processedRecentClips = new Set();
+let processedFavoriteClips = new Set();
+let remainingRecentClips = [];
+let remainingFavoriteClips = [];
+
+// Calculate approximate token count for a text
+function estimateTokenCount(text) {
+  // Rough estimation: 1 token ≈ 4 characters
+  return Math.ceil(text.length / 4);
+}
+
+// Get next chunk of clips that fits within token limit
+function getNextChunk(clips, tokenLimit) {
+  let totalTokens = 0;
+  const chunk = [];
+  
+  for (const clip of clips) {
+    const tokenCount = estimateTokenCount(clip.text);
+    if (totalTokens + tokenCount <= tokenLimit) {
+      chunk.push(clip);
+      totalTokens += tokenCount;
+    } else {
+      break;
+    }
+  }
+  
+  return chunk;
+}
+
+// Load clips based on current tab
+async function loadClips(loadMore = false) {
   try {
+    const currentTab = document.querySelector('.tab-btn.active').dataset.tab;
     const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
       await chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips', 'maxFavorites']);
-    
-    // Ensure we don't exceed the limits
-    recentClips = savedRecent.slice(0, maxClips);
-    favoriteClips = savedFavorites.slice(0, maxFavorites);
-    
-    // Update the lists
-    updateRecentList(recentClips, favoriteClips);
+
+    if (!loadMore) {
+      if (currentTab === 'recent') {
+        processedRecentClips.clear();
+        recentClips = [];
+        remainingRecentClips = savedRecent
+          .slice(0, maxClips)
+          .filter(clip => !processedRecentClips.has(clip.id));
+      } else {
+        processedFavoriteClips.clear();
+        favoriteClips = [];
+        remainingFavoriteClips = savedFavorites
+          .slice(0, maxFavorites)
+          .filter(clip => !processedFavoriteClips.has(clip.id));
+      }
+    }
+
+    if (currentTab === 'recent') {
+      // Get next chunk of recent clips
+      const newClips = getNextChunk(remainingRecentClips, TOKEN_LIMIT);
+      newClips.forEach(clip => processedRecentClips.add(clip.id));
+      remainingRecentClips = remainingRecentClips.filter(clip => !processedRecentClips.has(clip.id));
+
+      if (loadMore) {
+        recentClips = [...recentClips, ...newClips];
+      } else {
+        recentClips = newClips;
+      }
+      
+      // Always load all favorites for the favorite button state
+      favoriteClips = savedFavorites.slice(0, maxFavorites);
+      updateRecentList(recentClips, favoriteClips);
+
+      // Update search more button for recent tab
+      const searchMoreBtn = document.getElementById('searchMoreBtn');
+      if (searchMoreBtn) {
+        searchMoreBtn.style.display = remainingRecentClips.length > 0 ? 'block' : 'none';
+      }
+    } else {
+      // Get next chunk of favorite clips
+      const newClips = getNextChunk(remainingFavoriteClips, TOKEN_LIMIT);
+      newClips.forEach(clip => processedFavoriteClips.add(clip.id));
+      remainingFavoriteClips = remainingFavoriteClips.filter(clip => !processedFavoriteClips.has(clip.id));
+
+      if (loadMore) {
+        favoriteClips = [...favoriteClips, ...newClips];
+      } else {
+        favoriteClips = newClips;
+      }
+      
+      updateList('favoritesList', favoriteClips, favoriteClips);
+
+      // Update search more button for favorites tab
+      const searchMoreBtn = document.getElementById('searchMoreBtn');
+      if (searchMoreBtn) {
+        searchMoreBtn.style.display = remainingFavoriteClips.length > 0 ? 'block' : 'none';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading clips:', error);
+  }
+} loadMoreBtn = document.createElement('button');
+      loadMoreBtn.id = 'searchMoreBtn';
+      loadMoreBtn.className = 'search-more-btn';
+      loadMoreBtn.textContent = 'Pesquisar mais resultados';
+      loadMoreBtn.addEventListener('click', () => loadClips(true));
+      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
+    }
     updateList('favoritesList', favoriteClips, favoriteClips);
   } catch (error) {
     console.error('Error loading clips:', error);
@@ -586,7 +692,7 @@ async function checkPinnedWindow() {
 }
 
 // Search for clips
-async function performSearch(isSemanticSearch = false) {
+async function performSearch(isSemanticSearch = false, isAutoLoading = false) {
   const searchInput = document.getElementById('searchInput');
   const query = searchInput.value.trim().toLowerCase();
   
@@ -611,8 +717,17 @@ async function performSearch(isSemanticSearch = false) {
         return;
       }
       
-      results = await performSemanticSearch(query);
+      results = await performSemanticSearch(query, isAutoLoading);
       isSemanticSearchActive = true;
+      
+      // Update search more button visibility only if we found results
+      const searchMoreBtn = document.getElementById('searchMoreBtn');
+      if (searchMoreBtn) {
+        const hasMore = currentTab === 'recent' ? 
+          remainingRecentClips.length > 0 : 
+          remainingFavoriteClips.length > 0;
+        searchMoreBtn.style.display = (results.length > 0 && hasMore) ? 'block' : 'none';
+      }
     } else {
       // Ensure all clips have text property and are unique
       const uniqueClips = new Map();
@@ -639,7 +754,8 @@ async function performSearch(isSemanticSearch = false) {
       updateList('favoritesList', favoriteResults, favoriteClips);
     }
 
-    if (results.length === 0) {
+    // Only show empty state if no results were found and we're not auto-loading
+    if (results.length === 0 && !isAutoLoading) {
       showEmptyState(isSemanticSearchActive);
     }
   } catch (error) {
@@ -649,11 +765,15 @@ async function performSearch(isSemanticSearch = false) {
 }
 
 // Perform semantic search
-async function performSemanticSearch(query) {
+async function performSemanticSearch(query, isAutoLoading = false) {
   try {
+    // Get current clips based on active tab
+    const currentClips = currentTab === 'recent' ? recentClips : favoriteClips;
+    
     const response = await chrome.runtime.sendMessage({
       action: 'semanticSearch',
-      query: query
+      query: query,
+      clips: currentClips
     });
 
     if (!response || !response.success) {
@@ -668,15 +788,16 @@ async function performSemanticSearch(query) {
     }
 
     // Get existing clips for comparison
-    const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    const existingClips = [...recentClips, ...favoriteClips];
+    const { recentClips: allRecent = [], favoriteClips: allFavorites = [] } = 
+      await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    const existingClips = [...allRecent, ...allFavorites];
 
     // Normalize and deduplicate results
     const uniqueResults = new Set(response.results.map(result => 
       typeof result === 'string' ? result : result.text
     ));
 
-    return Array.from(uniqueResults).map(text => {
+    const results = Array.from(uniqueResults).map(text => {
       // Check if this text already exists in any clip
       const existingClip = existingClips.find(clip => clip.text === text);
       if (existingClip) {
@@ -689,6 +810,22 @@ async function performSemanticSearch(query) {
         timestamp: new Date().toISOString()
       };
     });
+
+    // If no results found and not already auto-loading, try loading more clips
+    if (results.length === 0 && !isAutoLoading) {
+      const hasMore = currentTab === 'recent' ? 
+        remainingRecentClips.length > 0 : 
+        remainingFavoriteClips.length > 0;
+      
+      if (hasMore) {
+        // Load more clips
+        await loadClips(true);
+        // Recursively search in the new chunks
+        return performSemanticSearch(query, true);
+      }
+    }
+
+    return results;
   } catch (error) {
     console.error('Semantic search error:', error);
     throw error;
@@ -725,6 +862,17 @@ async function addClip(text) {
     // Save and update UI
     await saveClips();
     updateRecentList(recentClips, favoriteClips);
+    
+    // Add load more button if not exists
+    let loadMoreBtn = document.getElementById('loadMoreBtn');
+    if (!loadMoreBtn) {
+      loadMoreBtn = document.createElement('button');
+      loadMoreBtn.id = 'searchMoreBtn';
+      loadMoreBtn.className = 'search-more-btn';
+      loadMoreBtn.textContent = 'Pesquisar mais resultados';
+      loadMoreBtn.addEventListener('click', () => loadClips(true));
+      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
+    }
   } catch (error) {
     console.error('Error adding clip:', error);
   }
@@ -767,6 +915,17 @@ async function toggleFavorite(clip) {
       // Update both lists to reflect changes
       if (currentTab === 'recent') {
         updateRecentList(recentClips, favoriteClips);
+    
+    // Add load more button if not exists
+    let loadMoreBtn = document.getElementById('loadMoreBtn');
+    if (!loadMoreBtn) {
+      loadMoreBtn = document.createElement('button');
+      loadMoreBtn.id = 'searchMoreBtn';
+      loadMoreBtn.className = 'search-more-btn';
+      loadMoreBtn.textContent = 'Pesquisar mais resultados';
+      loadMoreBtn.addEventListener('click', () => loadClips(true));
+      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
+    }
       } else {
         updateList('favoritesList', favoriteClips, favoriteClips);
       }
@@ -1113,6 +1272,17 @@ function startPolling() {
   updateInterval = setInterval(async () => {
     const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
     updateRecentList(recentClips, favoriteClips);
+    
+    // Add load more button if not exists
+    let loadMoreBtn = document.getElementById('loadMoreBtn');
+    if (!loadMoreBtn) {
+      loadMoreBtn = document.createElement('button');
+      loadMoreBtn.id = 'searchMoreBtn';
+      loadMoreBtn.className = 'search-more-btn';
+      loadMoreBtn.textContent = 'Pesquisar mais resultados';
+      loadMoreBtn.addEventListener('click', () => loadClips(true));
+      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
+    }
     updateList('favoritesList', favoriteClips, favoriteClips);
   }, 1000); // Check every second
 }
