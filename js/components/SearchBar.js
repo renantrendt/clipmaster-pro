@@ -198,7 +198,14 @@ export class SearchBar {
       if (results.length === 0) {
         this.onShowEmpty(isSemanticSearch);
       } else {
-        this.onUpdateUI();
+        const currentTab = this.getCurrentTab();
+        if (currentTab === 'recent') {
+          this.onUpdateUI(results, results.filter(clip => 
+            clip.isFavorite
+          ));
+        } else {
+          this.onUpdateUI(results, results);
+        }
       }
     } catch (error) {
       console.error('Error performing search:', error);
@@ -285,8 +292,8 @@ export class SearchBar {
 
   updateSearchState() {
     if (this.searchInput) {
-      this.searchInput.disabled = !this.isPro;
-      this.searchInput.title = this.isPro ? 'Search your clips' : 'Available only in Pro version';
+      this.searchInput.disabled = false;
+      this.searchInput.title = 'Search your clips';
     }
   }
 
@@ -331,5 +338,24 @@ export class SearchBar {
   enable() {
     this.searchInput.disabled = false;
     this.aiSearchBtn.disabled = false;
+  }
+
+  triggerAISearch() {
+    if (this.getValue() && !this.aiSearchBtn.disabled) {
+      this.aiSearchBtn.click();
+    }
+  }
+
+  handleSearchMoreButton(listId) {
+    const hasResults = this.lastSearchResults && this.lastSearchResults.length > 0;
+    const remainingClips = this.getCurrentTab() === 'recent' ? 
+      this.remainingRecentClips : 
+      this.remainingFavoriteClips;
+    
+    if (hasResults && remainingClips.length > 0) {
+      this.addSearchMoreButton(listId);
+    } else {
+      this.removeSearchMoreButton();
+    }
   }
 }

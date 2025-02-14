@@ -38,7 +38,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initializePopup() {
   try {
-    await switchTab('recent');
+    // Set initial tab state
+    const recentTab = document.querySelector('.tab-btn[data-tab="recent"]');
+    const recentList = document.querySelector('.clip-list[data-tab="recent"]');
+    if (recentTab && recentList) {
+      recentTab.classList.add('active');
+      recentList.classList.add('active');
+    }
+
+    // Load initial clips
+    currentTab = 'recent';
+    await loadClips(false);
     
     // Check if window is already pinned
     const { pinnedWindow } = await chrome.storage.local.get('pinnedWindow');
@@ -230,16 +240,8 @@ async function switchTab(tab) {
       if (tab === 'recent') {
         updateRecentList(recentClips, favoriteClips);
     
-    // Add load more button if not exists
-    let loadMoreBtn = document.getElementById('loadMoreBtn');
-    if (!loadMoreBtn) {
-      loadMoreBtn = document.createElement('button');
-      loadMoreBtn.id = 'searchMoreBtn';
-      loadMoreBtn.className = 'search-more-btn';
-      loadMoreBtn.textContent = 'Pesquisar mais resultados';
-      loadMoreBtn.addEventListener('click', () => loadClips(true));
-      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
-    }
+    // Add search more button if needed
+    searchBar.handleSearchMoreButton('recentList');
       } else if (tab === 'favorites') {
         updateList('favoritesList', favoriteClips, favoriteClips);
       }
@@ -255,7 +257,8 @@ let remainingFavoriteClips = [];
 // Load clips based on current tab
 export async function loadClips(loadMore = false) {
   try {
-    const currentTab = document.querySelector('.tab-btn.active').dataset.tab;
+    // Use the global currentTab variable instead of querying DOM
+    if (!currentTab) return;
     const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
       await chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips', 'maxFavorites']);
 
@@ -322,8 +325,30 @@ async function updateList(listId, clips, favoriteClips) {
   
   // Check if there are clips to show
   if (!clips || clips.length === 0) {
-    searchBar.showEmptyState(false);
+    // Show empty state for this list
+    const emptyState = list.querySelector('.empty-state') || 
+      list.appendChild(document.createElement('div'));
+    emptyState.className = 'empty-state';
+    emptyState.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        ${listId === 'recentList' ? 
+          '<path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' :
+          '<path d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        }
+      </svg>
+      <p class="empty-description">
+        ${listId === 'recentList' ? 
+          'No recent clips. Copy some text to get started!' : 
+          'No favorite clips. Star your first clip to save it here'}
+      </p>
+    `;
     return;
+  }
+  
+  // Remove empty state if it exists since we have clips
+  const emptyState = list.querySelector('.empty-state');
+  if (emptyState) {
+    emptyState.remove();
   }
   
   console.log(`Updating ${listId} with ${clips.length} clips`);
@@ -629,16 +654,8 @@ async function addClip(text) {
     await saveClips();
     updateRecentList(recentClips, favoriteClips);
     
-    // Add load more button if not exists
-    let loadMoreBtn = document.getElementById('loadMoreBtn');
-    if (!loadMoreBtn) {
-      loadMoreBtn = document.createElement('button');
-      loadMoreBtn.id = 'searchMoreBtn';
-      loadMoreBtn.className = 'search-more-btn';
-      loadMoreBtn.textContent = 'Pesquisar mais resultados';
-      loadMoreBtn.addEventListener('click', () => loadClips(true));
-      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
-    }
+    // Add search more button if needed
+    searchBar.handleSearchMoreButton('recentList');
   } catch (error) {
     console.error('Error adding clip:', error);
   }
@@ -682,16 +699,8 @@ async function toggleFavorite(clip) {
       if (currentTab === 'recent') {
         updateRecentList(recentClips, favoriteClips);
     
-    // Add load more button if not exists
-    let loadMoreBtn = document.getElementById('loadMoreBtn');
-    if (!loadMoreBtn) {
-      loadMoreBtn = document.createElement('button');
-      loadMoreBtn.id = 'searchMoreBtn';
-      loadMoreBtn.className = 'search-more-btn';
-      loadMoreBtn.textContent = 'Pesquisar mais resultados';
-      loadMoreBtn.addEventListener('click', () => loadClips(true));
-      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
-    }
+    // Add search more button if needed
+    searchBar.handleSearchMoreButton('recentList');
       } else {
         updateList('favoritesList', favoriteClips, favoriteClips);
       }
@@ -970,14 +979,14 @@ function setupProHints() {
 }
 
 // UI update function
-async function updateUI() {
+async function updateUI(searchResults = null, searchFavorites = null) {
   try {
     const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
     
     if (currentTab === 'recent') {
-      updateList('recentList', recentClips, favoriteClips);
+      updateList('recentList', searchResults || recentClips, searchFavorites || favoriteClips);
     } else {
-      updateList('favoritesList', favoriteClips, favoriteClips);
+      updateList('favoritesList', searchResults || favoriteClips, searchFavorites || favoriteClips);
     }
     
     searchBar.updateSearchState();
@@ -996,16 +1005,8 @@ function startPolling() {
     const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
     updateRecentList(recentClips, favoriteClips);
     
-    // Add load more button if not exists
-    let loadMoreBtn = document.getElementById('loadMoreBtn');
-    if (!loadMoreBtn) {
-      loadMoreBtn = document.createElement('button');
-      loadMoreBtn.id = 'searchMoreBtn';
-      loadMoreBtn.className = 'search-more-btn';
-      loadMoreBtn.textContent = 'Pesquisar mais resultados';
-      loadMoreBtn.addEventListener('click', () => loadClips(true));
-      document.getElementById('recentList').parentNode.appendChild(loadMoreBtn);
-    }
+    // Add search more button if needed
+    searchBar.handleSearchMoreButton('recentList');
     updateList('favoritesList', favoriteClips, favoriteClips);
   }, 1000); // Check every second
 }
@@ -1034,11 +1035,7 @@ document.addEventListener('DOMContentLoaded', () => {
     await updateProButton();
     
     // If there's text in the search field, perform semantic search automatically
-    const query = searchBar.getValue();
-    const aiSearchBtn = document.getElementById('aiSearchBtn');
-    if (query) {
-      aiSearchBtn.click();
-    }
+    searchBar.triggerAISearch();
   });
 
   window.addEventListener('click', (event) => {
