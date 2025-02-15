@@ -1,4 +1,9 @@
 import { SearchBar } from './js/components/SearchBar.js';
+import './js/components/HeaderActions.js';
+import ClipList from './js/components/ClipList.js';
+
+// Register the custom element
+customElements.define('clip-list', ClipList);
 
 let currentTab = 'recent';
 let isPro = false;
@@ -6,6 +11,10 @@ let isPinned = false;
 let recentClips = [];
 let favoriteClips = [];
 let searchBar;
+
+let processedRecentClips = new Set();
+let processedFavoriteClips = new Set();
+let remainingRecentClips = [];
 
 const DEFAULT_RECENT_LIMIT = 50;
 const DEFAULT_FAVORITES_LIMIT = 10;
@@ -26,8 +35,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupProHints();
     await updateProButton();
     
+    // Add event listener for tab changes from the custom component
+    const tabsComponent = document.querySelector('app-tabs');
+    tabsComponent.addEventListener('tab-change', (event) => {
+      const activeTab = event.detail.activeTab;
+      switchTab(activeTab);
+    });
+    
     // Start polling if window is already pinned on load
-    const pinButton = document.getElementById('pinBtn');
+    const headerActions = document.querySelector('header-actions');
+    const pinButton = headerActions.shadowRoot.getElementById('pinBtn');
     if (pinButton.classList.contains('active')) {
       startPolling();
     }
@@ -38,6 +55,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initializePopup() {
   try {
+    // Initialize SearchBar first
+    searchBar = new SearchBar({
+      onSearch: (query) => searchBar.performSearch(false),
+      onAISearch: (query) => searchBar.performSearch(true),
+      onClear: updateUI,
+      onLoadMore: () => loadClips(true),
+      onUpdateUI: updateUI,
+      getCurrentTab: () => currentTab,
+      isPro: isPro
+    });
+    searchBar.init(document.getElementById('searchBarContainer'));
+    searchBar.updateSearchState();
+
     // Set initial tab state
     const recentTab = document.querySelector('.tab-btn[data-tab="recent"]');
     const recentList = document.querySelector('.clip-list[data-tab="recent"]');
@@ -74,7 +104,7 @@ chrome.runtime.onMessage.addListener((message) => {
 async function updateRecentList(recentClips, favoriteClips) {
   console.log('Updating recent list with', recentClips.length, 'clips');
   
-  const recentList = document.getElementById('recentList');
+  const recentList = document.getElementById('recentClipsList');
   if (!recentList) {
     console.error('Recent list element not found');
     return;
@@ -84,7 +114,6 @@ async function updateRecentList(recentClips, favoriteClips) {
   recentList.innerHTML = '';
   
   if (recentClips.length === 0) {
-    searchBar.showEmptyState(false);
     return;
   }
   
@@ -98,30 +127,6 @@ async function updateRecentList(recentClips, favoriteClips) {
 
 // Configure event listeners
 function setupEventListeners() {
-  // Tab switching
-  document.querySelectorAll('.tab-btn').forEach(button => {
-    button.addEventListener('click', (e) => {
-      const tab = e.target.dataset.tab;
-      if (tab) {
-        switchTab(tab);
-      }
-    });
-  });
-
-  // Initialize SearchBar component
-  searchBar = new SearchBar({
-    onSearch: (query) => searchBar.performSearch(false),
-    onAISearch: (query) => searchBar.performSearch(true),
-    onClear: updateUI,
-    onLoadMore: () => loadClips(true),
-    onUpdateUI: updateUI,
-    onShowEmpty: () => searchBar.showEmptyState(searchBar.isSemanticSearchActive),
-    onShowProModal: () => toggleModal('proModal', true),
-    getCurrentTab: () => currentTab,
-    isPro: isPro
-  });
-  searchBar.init(document.getElementById('searchBarContainer'));
-  searchBar.updateSearchState();
   // Settings Modal
   const settingsBtn = document.getElementById('settingsBtn');
   if (settingsBtn) {
@@ -179,7 +184,6 @@ function setupEventListeners() {
   }
 }
 
-// Switch between tabs
 async function switchTab(tab) {
   if (!tab) return;
   
@@ -190,176 +194,229 @@ async function switchTab(tab) {
   currentTab = tab;
   
   // Remove active class from all tabs and lists
-  document.querySelectorAll('.tab-btn, .clip-list').forEach(el => {
+  document.querySelectorAll('.tab-btn, clip-list').forEach(el => {
     el.classList.remove('active');
   });
   
   // Add active class to selected tab and list
   const selectedTab = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
-  const selectedList = document.querySelector(`.clip-list[data-tab="${tab}"]`);
+  const selectedList = document.querySelector(`clip-list[type="${tab}"]`);
   
-  if (selectedTab && selectedList) {
-    selectedTab.classList.add('active');
+  if (selectedTab) selectedTab.classList.add('active');
+  if (selectedList) {
     selectedList.classList.add('active');
-    
-    // Reset clips and load new tab content
-    await loadClips(false);
-    
-    // Check if there's an active search
-    const query = searchBar.getValue();
-    if (query) {
-      // If there's a search query and we have results, use them
-      if (searchBar.lastSearchResults) {
-        if (currentTab === 'recent') {
-          updateList('recentList', searchBar.lastSearchResults, favoriteClips);
-        } else {
-          const favoriteResults = searchBar.lastSearchResults.filter(clip => 
-            favoriteClips.some(f => f.text === clip.text)
-          );
-          updateList('favoritesList', favoriteResults, favoriteClips);
-        }
-        
-        // Show empty state if needed
-        if (searchBar.lastSearchResults.length === 0) {
-          searchBar.showEmptyState(searchBar.isSemanticSearchActive);
-        }
-      } else {
-        // If no cached results, perform the search again
-        searchBar.performSearch(searchBar.isSemanticSearchActive);
-      }
-    } else {
-      // If no search, load all clips
-      const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
-        await chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips', 'maxFavorites']);
-      
-      // Ensure we don't exceed the limits
-      recentClips = savedRecent.slice(0, maxClips);
-      favoriteClips = savedFavorites.slice(0, maxFavorites);
-      
-      // Update only the active list
-      if (tab === 'recent') {
-        updateRecentList(recentClips, favoriteClips);
-    
-    // Add search more button if needed
-    searchBar.handleSearchMoreButton('recentList');
-      } else if (tab === 'favorites') {
-        updateList('favoritesList', favoriteClips, favoriteClips);
-      }
-    }
+    // Trigger re-render of the list
+    selectedList.setAttribute('type', tab);
   }
+  
+  // Update tabs component
+  const tabsComponent = document.querySelector('app-tabs');
+  if (tabsComponent) {
+    tabsComponent.setAttribute('current-tab', tab);
+  }
+  
+  // Load clips for the current tab
+  await loadClips(false);
 }
 
-
-let remainingFavoriteClips = [];
-
-
-
-// Load clips based on current tab
-export async function loadClips(loadMore = false) {
+async function loadClips(loadMore = false) {
   try {
-    // Use the global currentTab variable instead of querying DOM
-    if (!currentTab) return;
-    const { recentClips: savedRecent = [], favoriteClips: savedFavorites = [], maxClips = DEFAULT_RECENT_LIMIT, maxFavorites = 5 } = 
-      await chrome.storage.local.get(['recentClips', 'favoriteClips', 'maxClips', 'maxFavorites']);
-
-    if (!loadMore) {
-      if (currentTab === 'recent') {
-        processedRecentClips.clear();
-        recentClips = [];
-        remainingRecentClips = savedRecent
-          .slice(0, maxClips)
-          .filter(clip => !processedRecentClips.has(clip.id));
-      } else {
-        processedFavoriteClips.clear();
-        favoriteClips = [];
-        remainingFavoriteClips = savedFavorites
-          .slice(0, maxFavorites)
-          .filter(clip => !processedFavoriteClips.has(clip.id));
+    const { recentClips, favoriteClips } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
+    
+    // Sanitize clips before serialization
+    const sanitizedRecentClips = (recentClips || [])
+      .map(clip => ({
+        text: clip.text || '',
+        timestamp: clip.timestamp || Date.now(),
+        id: clip.id || crypto.randomUUID(),
+        type: 'recent'
+      }))
+      .filter(clip => clip.text.trim() !== '');
+    
+    const sanitizedFavoriteClips = (favoriteClips || [])
+      .map(clip => ({
+        text: clip.text || '',
+        timestamp: clip.timestamp || Date.now(),
+        id: clip.id || crypto.randomUUID(),
+        type: 'favorite'
+      }))
+      .filter(clip => clip.text.trim() !== '');
+    
+    const recentList = document.querySelector('clip-list[type="recent"]');
+    const favoriteList = document.querySelector('clip-list[type="favorite"]');
+    
+    if (recentList) {
+      try {
+        // Use ultra-safe serialization
+        const safeRecentClipsJson = safeJsonStringify(sanitizedRecentClips);
+        console.log('Recent clips JSON:', safeRecentClipsJson);
+        recentList.setAttribute('clips', safeRecentClipsJson);
+      } catch (serializeError) {
+        console.error('Error serializing recent clips:', serializeError);
+        recentList.setAttribute('clips', '[]');
       }
     }
-
-    if (currentTab === 'recent') {
-      // Get next chunk of recent clips
-      const newClips = getNextChunk(remainingRecentClips, TOKEN_LIMIT);
-      newClips.forEach(clip => processedRecentClips.add(clip.id));
-      remainingRecentClips = remainingRecentClips.filter(clip => !processedRecentClips.has(clip.id));
-
-      if (loadMore) {
-        recentClips = [...recentClips, ...newClips];
-      } else {
-        recentClips = newClips;
+    
+    if (favoriteList) {
+      try {
+        // Use ultra-safe serialization
+        const safeFavoriteClipsJson = safeJsonStringify(sanitizedFavoriteClips);
+        console.log('Favorite clips JSON:', safeFavoriteClipsJson);
+        favoriteList.setAttribute('clips', safeFavoriteClipsJson);
+      } catch (serializeError) {
+        console.error('Error serializing favorite clips:', serializeError);
+        favoriteList.setAttribute('clips', '[]');
       }
-      
-      // Always load all favorites for the favorite button state
-      favoriteClips = savedFavorites.slice(0, maxFavorites);
-      updateRecentList(recentClips, favoriteClips);
-    } else {
-      // Get next chunk of favorite clips
-      const newClips = getNextChunk(remainingFavoriteClips, TOKEN_LIMIT);
-      newClips.forEach(clip => processedFavoriteClips.add(clip.id));
-      remainingFavoriteClips = remainingFavoriteClips.filter(clip => !processedFavoriteClips.has(clip.id));
-
-      if (loadMore) {
-        favoriteClips = [...favoriteClips, ...newClips];
-      } else {
-        favoriteClips = newClips;
+    }
+    
+    // Update the current tab's list
+    const currentList = document.querySelector(`clip-list[type="${currentTab}"]`);
+    if (currentList) {
+      const clipsToShow = currentTab === 'recent' ? sanitizedRecentClips : sanitizedFavoriteClips;
+      try {
+        // Use ultra-safe serialization
+        const safeCurrentClipsJson = safeJsonStringify(clipsToShow);
+        console.log(`${currentTab} clips JSON:`, safeCurrentClipsJson);
+        currentList.setAttribute('clips', safeCurrentClipsJson);
+      } catch (serializeError) {
+        console.error('Error serializing current tab clips:', serializeError);
+        currentList.setAttribute('clips', '[]');
       }
-      
-      updateList('favoritesList', favoriteClips, favoriteClips);
+    }
+    
+    // Optional: Update search bar, but only if it's initialized
+    if (searchBar && typeof searchBar.updateSearchState === 'function') {
+      searchBar.updateSearchState();
     }
   } catch (error) {
     console.error('Error loading clips:', error);
   }
 }
 
+// Ultra-safe JSON serialization
+function safeJsonStringify(obj) {
+  // Handle different input types
+  if (obj === null || obj === undefined) return '{}';
+  
+  try {
+    // Custom replacer to handle non-serializable values
+    return JSON.stringify(obj, (key, value) => {
+      // Handle special cases
+      if (value === undefined) return null;
+      if (typeof value === 'function') return value.toString();
+      if (value instanceof Error) {
+        return {
+          name: value.name,
+          message: value.message,
+          stack: value.stack
+        };
+      }
+      
+      // Escape problematic characters
+      if (typeof value === 'string') {
+        return value
+          .replace(/\\/g, '\\\\')   // Escape backslashes
+          .replace(/"/g, '\\"')     // Escape quotes
+          .replace(/\n/g, '\\n')    // Escape newlines
+          .replace(/\r/g, '\\r')    // Escape carriage returns
+          .replace(/\t/g, '\\t');   // Escape tabs
+      }
+      
+      return value;
+    }, 2);  // Use indentation for readability
+  } catch (error) {
+    console.error('Safe JSON stringify failed:', error);
+    return '{}';
+  }
+}
+
+// Utility function to safely escape text for JSON
+function escapeJsonString(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/\\/g, '\\\\')   // Escape backslashes first
+    .replace(/"/g, '\\"')     // Escape double quotes
+    .replace(/\n/g, '\\n')    // Escape newlines
+    .replace(/\r/g, '\\r')    // Escape carriage returns
+    .replace(/\t/g, '\\t')    // Escape tabs
+    .replace(/\f/g, '\\f')    // Escape form feeds
+    .replace(/\v/g, '\\v');   // Escape vertical tabs
+}
+
+// Utility function to sanitize clip for JSON serialization
+function sanitizeClip(clip) {
+  if (!clip) return null;
+  
+  const sanitized = {
+    text: escapeJsonString(clip.text || ''),
+    timestamp: clip.timestamp || Date.now(),
+    id: clip.id || crypto.randomUUID(),
+    type: clip.type || 'recent'
+  };
+  
+  // Remove any non-serializable properties
+  Object.keys(sanitized).forEach(key => {
+    if (sanitized[key] === undefined) {
+      delete sanitized[key];
+    }
+  });
+  
+  return sanitized;
+}
+
+// Token limit for chunk processing
+const TOKEN_LIMIT = 1000;
+
+// Get next chunk of clips based on token limit
+function getNextChunk(clips, tokenLimit) {
+  const chunk = [];
+  let currentTokenCount = 0;
+
+  for (const clip of clips) {
+    // Estimate token count (simple approximation)
+    const clipTokenCount = clip.text ? clip.text.length / 4 : 0;
+    
+    if (currentTokenCount + clipTokenCount <= tokenLimit) {
+      chunk.push(clip);
+      currentTokenCount += clipTokenCount;
+    } else {
+      break;
+    }
+  }
+
+  return chunk;
+}
+
 // Update list
 async function updateList(listId, clips, favoriteClips) {
-  const list = document.getElementById(listId);
-  if (!list) {
-    console.error(`List element ${listId} not found`);
-    return;
+  const clipList = document.getElementById(listId);
+  
+  if (clipList) {
+    // Determine which clips to render based on the list ID
+    const clipsToRender = listId === 'recentClipsList' 
+      ? clips 
+      : (listId === 'favoriteClipsList' ? favoriteClips : []);
+    
+    // Set clips attribute to trigger rendering
+    clipList.setAttribute('clips', JSON.stringify(clipsToRender));
   }
-  
-  // Clear the current list
-  list.innerHTML = '';
-  
-  // Check if there are clips to show
-  if (!clips || clips.length === 0) {
-    // Show empty state for this list
-    const emptyState = list.querySelector('.empty-state') || 
-      list.appendChild(document.createElement('div'));
-    emptyState.className = 'empty-state';
-    emptyState.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        ${listId === 'recentList' ? 
-          '<path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' :
-          '<path d="M19 21L12 16L5 21V5C5 4.46957 5.21071 3.96086 5.58579 3.58579C5.96086 3.21071 6.46957 3 7 3H17C17.5304 3 18.0391 3.21071 18.4142 3.58579C18.7893 3.96086 19 4.46957 19 5V21Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-        }
-      </svg>
-      <p class="empty-description">
-        ${listId === 'recentList' ? 
-          'No recent clips. Copy some text to get started!' : 
-          'No favorite clips. Star your first clip to save it here'}
-      </p>
-    `;
-    return;
-  }
-  
-  // Remove empty state if it exists since we have clips
-  const emptyState = list.querySelector('.empty-state');
-  if (emptyState) {
-    emptyState.remove();
-  }
-  
-  console.log(`Updating ${listId} with ${clips.length} clips`);
-  
-  // Create elements for each clip
-  clips.forEach(clip => {
-    const isFavorite = favoriteClips.some(f => f.text === clip.text);
-    const clipElement = createClipElement(clip, isFavorite);
-    list.appendChild(clipElement);
-  });
 }
+
+// Event listener for clip actions
+document.addEventListener('clip-copied', (event) => {
+  console.log('Clip copied:', event.detail.clip);
+  // Add any additional copy logic
+});
+
+document.addEventListener('toggle-favorite', (event) => {
+  const { clip, index, currentType } = event.detail;
+  
+  if (currentType === 'recent') {
+    addToFavorites(clip);
+  } else {
+    removeFromFavorites(clip);
+  }
+});
 
 // Create clip item
 function createClipElement(clip, isFavorite = false) {
@@ -655,7 +712,7 @@ async function addClip(text) {
     updateRecentList(recentClips, favoriteClips);
     
     // Add search more button if needed
-    searchBar.handleSearchMoreButton('recentList');
+    searchBar.handleSearchMoreButton('recentClipsList');
   } catch (error) {
     console.error('Error adding clip:', error);
   }
@@ -697,12 +754,12 @@ async function toggleFavorite(clip) {
     } else {
       // Update both lists to reflect changes
       if (currentTab === 'recent') {
-        updateRecentList(recentClips, favoriteClips);
+        updateList('recentClipsList', recentClips, favoriteClips);
     
     // Add search more button if needed
-    searchBar.handleSearchMoreButton('recentList');
+    searchBar.handleSearchMoreButton('recentClipsList');
       } else {
-        updateList('favoritesList', favoriteClips, favoriteClips);
+        updateList('favoriteClipsList', favoriteClips, favoriteClips);
       }
     }
   } catch (error) {
@@ -984,9 +1041,9 @@ async function updateUI(searchResults = null, searchFavorites = null) {
     const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
     
     if (currentTab === 'recent') {
-      updateList('recentList', searchResults || recentClips, searchFavorites || favoriteClips);
+      updateList('recentClipsList', searchResults || recentClips, searchFavorites || favoriteClips);
     } else {
-      updateList('favoritesList', searchResults || favoriteClips, searchFavorites || favoriteClips);
+      updateList('favoriteClipsList', searchResults || favoriteClips, searchFavorites || favoriteClips);
     }
     
     searchBar.updateSearchState();
@@ -1003,11 +1060,11 @@ function startPolling() {
   console.log('Starting clip polling...');
   updateInterval = setInterval(async () => {
     const { recentClips = [], favoriteClips = [] } = await chrome.storage.local.get(['recentClips', 'favoriteClips']);
-    updateRecentList(recentClips, favoriteClips);
+    updateList('recentClipsList', recentClips, favoriteClips);
     
     // Add search more button if needed
-    searchBar.handleSearchMoreButton('recentList');
-    updateList('favoritesList', favoriteClips, favoriteClips);
+    searchBar.handleSearchMoreButton('recentClipsList');
+    updateList('favoriteClipsList', favoriteClips, favoriteClips);
   }, 1000); // Check every second
 }
 
