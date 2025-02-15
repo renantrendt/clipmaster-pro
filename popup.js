@@ -1091,10 +1091,20 @@ function stopPolling() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Inicializa componentes
   const proModal = document.getElementById('proModal');
   const closeBtn = proModal.querySelector('.close-btn');
   const upgradeBtn = document.getElementById('upgradeBtn');
+  const tabsComponent = document.querySelector('app-tabs');
+
+  // Seleciona a aba recent
+  if (tabsComponent) {
+    tabsComponent.setAttribute('current-tab', 'recent');
+  }
+
+  // Carrega os clips iniciais
+  await loadClips();
 
   closeBtn.addEventListener('click', () => {
     proModal.style.display = 'none';
