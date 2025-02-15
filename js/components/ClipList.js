@@ -5,7 +5,7 @@ class ClipList extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.clips = [];
-    this.type = 'recent'; // Default type
+    this.type = 'recent';
   }
 
   static get observedAttributes() {
@@ -13,22 +13,14 @@ class ClipList extends HTMLElement {
   }
 
   connectedCallback() {
-    // Initial setup
     this.type = this.getAttribute('type') || 'recent';
     this.render();
-    this.setupEventListeners();
-
-    // Adiciona listener para mudanças de aba
-    const tabsComponent = document.querySelector('app-tabs');
-    if (tabsComponent) {
-      tabsComponent.addEventListener('tab-change', () => this.updateVisibility());
-    }
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
     if (name === 'clips') {
       try {
-        // Safely parse clips
+        // Tenta parsear clips com segurança
         this.clips = newValue ? JSON.parse(newValue) : [];
         this.render();
       } catch (error) {
@@ -39,7 +31,6 @@ class ClipList extends HTMLElement {
     }
 
     if (name === 'type') {
-      // Update type and re-render
       this.type = newValue || 'recent';
       this.render();
     }
@@ -50,7 +41,7 @@ class ClipList extends HTMLElement {
       <style>
         :host {
           display: block;
-          width: 100%;
+          margin-bottom: 8px;
           transition: opacity 0.3s ease;
         }
         :host(.hidden) {
@@ -84,13 +75,19 @@ class ClipList extends HTMLElement {
       </style>
     `;
 
-    // Always determine current tab
+    // Verifica se é a aba atual
     const tabsComponent = document.querySelector('app-tabs');
     const currentTab = tabsComponent ? tabsComponent.getAttribute('current-tab') : 'recent';
     const isCurrentTab = currentTab === this.type;
 
-    // Remove or add hidden class based on current tab
+    // Atualiza visibilidade
     this.classList.toggle('hidden', !isCurrentTab);
+
+    // Se não for a aba atual, não renderiza nada
+    if (!isCurrentTab) {
+      this.shadowRoot.innerHTML = styles;
+      return;
+    }
 
     const isEmptyList = !this.clips || this.clips.length === 0;
 
@@ -150,13 +147,6 @@ class ClipList extends HTMLElement {
         bubbles: true 
       }));
     });
-  }
-
-  // Adiciona método para forçar atualização
-  updateVisibility() {
-    const tabsComponent = document.querySelector('app-tabs');
-    const currentTab = tabsComponent ? tabsComponent.getAttribute('current-tab') : 'recent';
-    this.classList.toggle('hidden', currentTab !== this.type);
   }
 }
 

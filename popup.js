@@ -487,6 +487,11 @@ function createClipElement(clip, isFavorite = false) {
 // Configure max clips controls
 function setupMaxClipsControls() {
   const input = document.getElementById('maxClips');
+  if (!input) {
+    console.log('Max clips input not found');
+    return;
+  }
+
   const decrease = document.querySelector('.decrease');
   const increase = document.querySelector('.increase');
   
@@ -502,14 +507,23 @@ function setupMaxClipsControls() {
   });
   
   // Buttons
-  decrease.addEventListener('click', () => incrementMaxClips(-1));
-  increase.addEventListener('click', () => incrementMaxClips(1));
+  if (decrease) {
+    decrease.addEventListener('click', () => incrementMaxClips(-1));
+  }
+  if (increase) {
+    increase.addEventListener('click', () => incrementMaxClips(1));
+  }
 }
 
 function incrementMaxClips(delta) {
   const input = document.getElementById('maxClips');
+  if (!input) {
+    console.log('Max clips input not found');
+    return;
+  }
+
   const currentValue = parseInt(input.value) || 50;
-  const newValue = currentValue + delta;
+  const newValue = Math.max(10, Math.min(50, currentValue + delta));
   
   if (newValue > 50 && !isPro) {
     showProUpgradeModal();
@@ -1100,4 +1114,53 @@ document.addEventListener('DOMContentLoaded', () => {
       proModal.style.display = 'none';
     }
   });
+});
+
+// Inicialização do popup
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    // Inicializa o popup primeiro
+    await initializePopup();
+
+    // Configura event listeners
+    setupEventListeners();
+
+    // Configura modal de configurações
+    setupSettingsModal();
+
+    // Carrega configurações
+    await loadSettings();
+
+    // Configura controles de clips máximos
+    setupMaxClipsControls();
+
+    // Configura botão de atualização pro
+    updateProButton();
+
+    // Configura dicas pro
+    setupProHints();
+
+    // Inicializa configurações
+    initializeSettings();
+
+    // Configura botão de pin
+    updatePinButton();
+
+    // Configura modais
+    const proModal = document.getElementById('proModal');
+    if (proModal) {
+      const closeBtn = proModal.querySelector('.close-btn');
+      const upgradeBtn = document.getElementById('upgradeBtn');
+
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => toggleModal('proModal', false));
+      }
+
+      if (upgradeBtn) {
+        upgradeBtn.addEventListener('click', startCheckout);
+      }
+    }
+  } catch (error) {
+    console.error('Error initializing popup:', error);
+  }
 });
