@@ -1,3 +1,5 @@
+import FavoriteActions from './FavoriteActions.js';
+
 class ClipItem extends HTMLElement {
   constructor() {
     super();
@@ -9,84 +11,20 @@ class ClipItem extends HTMLElement {
 
   connectedCallback() {
     try {
-      // Detailed logging of clip attribute
       const clipAttr = this.getAttribute('clip');
       console.log('Raw clip attribute:', clipAttr);
-      console.log('Attribute type:', typeof clipAttr);
-      console.log('Attribute length:', clipAttr ? clipAttr.length : 'N/A');
       
-      // Extensive parsing strategies
+      // Parsing strategy
       let parsedClip = null;
-      
-      // Strategy 1: Direct JSON parse with detailed error handling
       try {
-        if (clipAttr) {
-          // Log the exact string being parsed
-          console.log('Attempting to parse:', clipAttr);
-          
-          // Validate string before parsing
-          if (typeof clipAttr !== 'string') {
-            throw new Error('Clip attribute is not a string');
-          }
-          
-          // Trim and validate
-          const trimmedAttr = clipAttr.trim();
-          if (!trimmedAttr.startsWith('{') || !trimmedAttr.endsWith('}')) {
-            throw new Error('Invalid JSON structure');
-          }
-          
-          parsedClip = JSON.parse(trimmedAttr);
-        }
-      } catch (jsonError) {
-        console.error('Direct JSON parse failed:', {
-          message: jsonError.message,
-          name: jsonError.name,
-          stack: jsonError.stack
-        });
+        parsedClip = clipAttr ? JSON.parse(clipAttr) : null;
+      } catch (error) {
+        console.error('Error parsing clip:', error);
       }
       
-      // Strategy 2: Comprehensive error recovery
       if (!parsedClip) {
-        try {
-          // Multiple cleaning strategies
-          const cleaningStrategies = [
-            attr => attr.replace(/\\"/g, '"'),  // Unescape quotes
-            attr => attr.replace(/\\/g, ''),    // Remove all backslashes
-            attr => attr.replace(/\n/g, ' '),   // Replace newlines
-            attr => attr.slice(1, -1)           // Remove outer quotes
-          ];
-          
-          for (const cleanStrategy of cleaningStrategies) {
-            try {
-              const cleanedAttr = cleanStrategy(clipAttr);
-              console.log('Trying cleaned attribute:', cleanedAttr);
-              parsedClip = JSON.parse(cleanedAttr);
-              if (parsedClip) break;
-            } catch (cleanError) {
-              console.warn('Cleaning strategy failed:', cleanError.message);
-            }
-          }
-        } catch (recoveryError) {
-          console.error('Comprehensive recovery failed:', recoveryError);
-        }
-      }
-      
-      // Strategy 3: Absolute fallback
-      if (!parsedClip) {
-        console.warn('All parsing strategies failed. Using fallback.');
         parsedClip = {
-          text: clipAttr || 'Unrecoverable Clip',
-          timestamp: Date.now(),
-          id: crypto.randomUUID(),
-          type: 'recent'
-        };
-      }
-      
-      // Final validation
-      if (typeof parsedClip !== 'object' || parsedClip === null) {
-        console.error('Invalid parsed clip:', parsedClip);
-        parsedClip = {
-          text: 'Invalid Clip Data',
+          text: clipAttr || 'Invalid Clip',
           timestamp: Date.now(),
           id: crypto.randomUUID(),
           type: 'recent'
@@ -100,19 +38,7 @@ class ClipItem extends HTMLElement {
       this.render();
       this.setupEventListeners();
     } catch (error) {
-      console.error('Catastrophic error in clip parsing:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      });
-      
-      this.clip = {
-        text: 'Unrecoverable Error',
-        timestamp: Date.now(),
-        id: crypto.randomUUID(),
-        type: 'recent'
-      };
-      this.render();
+      console.error('Error in connectedCallback:', error);
     }
   }
 
@@ -129,20 +55,6 @@ class ClipItem extends HTMLElement {
           parsedClip = newValue ? JSON.parse(newValue) : null;
         } catch (jsonError) {
           console.warn('Direct JSON parse failed, trying alternative parsing:', jsonError);
-        }
-        
-        if (!parsedClip) {
-          try {
-            const cleanAttr = newValue
-              .replace(/\\"/g, '"')
-              .replace(/\\n/g, '\n')
-              .replace(/\\r/g, '\r')
-              .replace(/\\t/g, '\t');
-            
-            parsedClip = JSON.parse(cleanAttr);
-          } catch (cleanParseError) {
-            console.warn('Cleaned JSON parse failed:', cleanParseError);
-          }
         }
         
         if (!parsedClip) {
@@ -179,107 +91,50 @@ class ClipItem extends HTMLElement {
   }
 
   render() {
-    const styles = `
-      <style>
-        :host {
-          display: block;
-          margin-bottom: 8px;
-        }
-        .clip-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background-color: #f5f5f5;
-          border-radius: 8px;
-          padding: 10px;
-          cursor: pointer;
-          transition: background-color 0.2s ease;
-          position: relative;
-          overflow: hidden;
-        }
-        .clip-item:hover {
-          background-color: #e9e9e9;
-        }
-        .clip-item.clicked::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(0, 255, 0, 0.2);
-          z-index: 1;
-          animation: clickFeedback 0.3s ease-out;
-        }
-        @keyframes clickFeedback {
-          0% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-        .clip-text {
-          flex-grow: 1;
-          margin-right: 10px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: calc(100% - 40px);
-          font-size: 14px;
-          line-height: 1.4;
-        }
-        .action-btn {
-          background: none;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          transition: background-color 0.2s ease;
-        }
-        .action-btn:hover {
-          background-color: rgba(0, 0, 0, 0.1);
-        }
-        .favorite-btn {
-          stroke: currentColor;
-          color: #666;
-        }
-        .favorite-btn.active {
-          color: #007bff;
-        }
-        .favorite-btn svg {
-          width: 16px;
-          height: 16px;
-        }
-      </style>
-    `;
+    console.log('Rendering ClipItem:', this.clip, 'Type:', this.type);
 
+    // Limpa o shadowRoot
+    this.shadowRoot.innerHTML = '';
+    
+    // Adiciona os estilos
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = '@import url("../../styles.css");';
+    this.shadowRoot.appendChild(styleSheet);
+
+    // Cria o elemento clip
     const clipElement = document.createElement('div');
     clipElement.className = 'clip-item';
     
+    // Adiciona o texto
     const textElement = document.createElement('div');
     textElement.className = 'clip-text';
     textElement.textContent = this.clip.text || 'Empty clip';
     
-    const favoriteButton = document.createElement('button');
-    const isFavorite = this.type === 'favorites';
-    favoriteButton.className = `action-btn favorite-btn${isFavorite ? ' active' : ''}`;
-    favoriteButton.innerHTML = `
-      <svg width="10" height="14" viewBox="0 0 14 18" stroke="currentColor" fill="${isFavorite ? 'currentColor' : 'none'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M13 17l-6-4-6 4V3a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"></path>
-      </svg>
-    `;
-    favoriteButton.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+    // Cria o componente favorite-actions
+    const favoriteActions = document.createElement('favorite-actions');
+    console.log('Creating favorite-actions with:', {
+      clip: JSON.stringify(this.clip),
+      isFavorite: this.type === 'favorites'
+    });
     
-    favoriteButton.addEventListener('click', (e) => {
-      e.stopPropagation();
+    favoriteActions.setAttribute('clip', JSON.stringify(this.clip));
+    favoriteActions.setAttribute('is-favorite', (this.type === 'favorites').toString());
+    
+    // Listen for favorite toggle events
+    favoriteActions.addEventListener('toggle-favorite', (event) => {
+      event.stopPropagation();
       this.dispatchEvent(new CustomEvent('toggle-favorite', { 
-        detail: { clip: this.clip },
+        detail: { 
+          clip: this.clip, 
+          index: this.index, 
+          currentType: this.type 
+        },
         bubbles: true,
         composed: true 
       }));
     });
     
+    // Adiciona evento de clique para copiar
     clipElement.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(this.clip.text);
@@ -299,10 +154,14 @@ class ClipItem extends HTMLElement {
       }
     });
     
+    // Monta a estrutura
     clipElement.appendChild(textElement);
-    clipElement.appendChild(favoriteButton);
+    clipElement.appendChild(favoriteActions);
     
-    this.shadowRoot.innerHTML = styles + clipElement.outerHTML;
+    // Adiciona ao shadowRoot
+    this.shadowRoot.appendChild(clipElement);
+    
+    console.log('ClipItem rendered successfully');
   }
 
   setupEventListeners() {
@@ -354,5 +213,8 @@ class ClipItem extends HTMLElement {
     }
   }
 }
+
+// Registra o componente personalizado
+customElements.define('clip-item', ClipItem);
 
 export default ClipItem;

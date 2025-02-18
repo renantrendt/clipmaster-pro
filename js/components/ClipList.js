@@ -39,39 +39,7 @@ class ClipList extends HTMLElement {
   render() {
     const styles = `
       <style>
-        :host {
-          display: block;
-          margin-bottom: 8px;
-          transition: opacity 0.3s ease;
-        }
-        :host(.hidden) {
-          opacity: 0;
-          pointer-events: none;
-        }
-        .clip-list {
-          max-height: 400px;
-          overflow-y: auto;
-          padding: 10px;
-        }
-        .empty-state {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-          text-align: center;
-        }
-        .empty-state svg {
-          width: 24px;
-          height: 24px;
-          stroke: currentColor;
-          margin-bottom: 10px;
-        }
-        .empty-description {
-          color: #666;
-          font-size: 14px;
-          text-align: center;
-        }
+        @import url('../../styles.css');
       </style>
     `;
 
@@ -106,7 +74,7 @@ class ClipList extends HTMLElement {
       clipListHTML = `
         <div class="empty-state">
           ${emptyStateIcon}
-          <p class="empty-description">
+          <p class="empty-state-description">
             ${this.type === 'recent' 
               ? 'No recent clips. Copy something to get started!' 
               : 'No favorite clips. Star a clip to save it here'}
@@ -115,7 +83,7 @@ class ClipList extends HTMLElement {
       `;
     } else {
       clipListHTML = `
-        <div class="clip-list">
+        <div class="clip-list${isCurrentTab ? ' active' : ''}">
           ${this.clips.map((clip, index) => `
             <clip-item 
               clip='${JSON.stringify(clip)}' 
